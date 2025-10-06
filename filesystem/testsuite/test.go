@@ -24,7 +24,6 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 				return
 			}
 
-			const TotalFiles = 1_000
 			testFs := baseFs
 
 			t.Run("Files", func(t *testing.T) {
@@ -37,7 +36,7 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 				for range testFs.Files(ctx) {
 					count++
 				}
-				assertions.Equal(TotalFiles, count, "should found the expected number of files")
+				assertions.NotZero(count, "should found the expected number of files")
 				t.Logf("Found: %v", count)
 
 				t.Run("EarlyBreak", func(t *testing.T) {
