@@ -10,6 +10,7 @@ import (
 	"iter"
 	"os"
 	"path"
+	"path/filepath"
 
 	"github.com/charlievieth/fastwalk"
 )
@@ -43,18 +44,23 @@ func (l *Local) Files(ctx context.Context) (seq iter.Seq[string]) {
 	go func() {
 		defer close(worker)
 
-		fastwalk.Walk(&conf, l.baseDirectory, func(dirPath string, d fs.DirEntry, err error) error {
+		fastwalk.Walk(&conf, l.baseDirectory, func(fileLocation string, d fs.DirEntry, err error) error {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
 			case <-closeCh:
 				return io.EOF
 			default:
-				if d.IsDir() {
+				info, err := d.Info()
+				if err != nil {
+					return fmt.Errorf("failed to get file info: %w", err)
+				}
+
+				if info.IsDir() || !info.Mode().IsRegular() {
 					return nil
 				}
 
-				filename := path.Join(dirPath, d.Name())
+				filename, _ := filepath.Rel(l.baseDirectory, fileLocation)
 
 				worker <- filename
 				return nil
