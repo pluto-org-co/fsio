@@ -3,11 +3,11 @@ package filesystem_test
 import (
 	"context"
 	"os"
-	"path"
 	"testing"
 	"time"
 
 	"github.com/pluto-org-co/fsio/filesystem"
+	"github.com/pluto-org-co/fsio/random"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,14 +20,15 @@ func Test_Copy(t *testing.T) {
 
 		assertions := assert.New(t)
 
-		home, err := os.UserHomeDir()
-		if !assertions.Nil(err, "failed to get home directory") {
-			return
-		}
+		files := func() (files []string) {
+			files = make([]string, 1_000)
+			for index := range files {
+				files[index] = random.String(10)
+			}
+			return files
+		}()
 
-		targetDir := path.Join(home, "Downloads")
-
-		src := filesystem.NewLocal(targetDir, 0o777, 0o777)
+		src := filesystem.NewRandom(files, 1024)
 
 		tempDir, err := os.MkdirTemp("", "*")
 		if !assertions.Nil(err, "failed create temporary directory") {
