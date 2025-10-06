@@ -7,6 +7,7 @@ import (
 	"crypto/sha512"
 	"encoding/hex"
 	"io"
+	"iter"
 	"os"
 	"testing"
 	"time"
@@ -45,6 +46,26 @@ func Test_Local(t *testing.T) {
 			assertions.NotZero(count, "should found more than one directory")
 			t.Logf("Found: %v", count)
 
+			t.Run("EarlyBreak", func(t *testing.T) {
+				assertions := assert.New(t)
+
+				ctx, cancel := context.WithTimeout(context.TODO(), time.Microsecond)
+				defer cancel()
+
+				root := filesystem.NewLocal(home, 0o777, 0o777)
+
+				pull, stop := iter.Pull(root.Files(ctx))
+				for range 10 {
+					_, valid := pull()
+					if !valid {
+						break
+					}
+				}
+				stop()
+
+				_, valid := pull()
+				assertions.False(valid, "should be invalid")
+			})
 			t.Run("Timeout", func(t *testing.T) {
 				assertions := assert.New(t)
 

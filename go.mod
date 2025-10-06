@@ -2,7 +2,10 @@ module github.com/pluto-org-co/fsio
 
 go 1.23.2
 
-require github.com/stretchr/testify v1.11.1
+require (
+	github.com/charlievieth/fastwalk v1.0.14
+	github.com/stretchr/testify v1.11.1
+)
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect

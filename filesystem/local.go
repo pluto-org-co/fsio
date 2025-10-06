@@ -10,6 +10,8 @@ import (
 	"iter"
 	"os"
 	"path"
+
+	"github.com/charlievieth/fastwalk"
 )
 
 type Local struct {
@@ -34,11 +36,19 @@ func NewLocal(root string, dirPerm, filePerm fs.FileMode) (l *Local) {
 var _ Filesystem = (*Local)(nil)
 
 func (l *Local) Files(ctx context.Context) (seq iter.Seq[string]) {
-	return func(yield func(string) bool) {
-		fs.WalkDir(l.chdir, ".", func(dirPath string, d fs.DirEntry, err error) (errFinal error) {
+	conf := fastwalk.DefaultConfig
+
+	worker := make(chan string, 1_000)
+	closeCh := make(chan struct{}, 1)
+	go func() {
+		defer close(worker)
+
+		fastwalk.Walk(&conf, l.baseDirectory, func(dirPath string, d fs.DirEntry, err error) error {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
+			case <-closeCh:
+				return io.EOF
 			default:
 				if d.IsDir() {
 					return nil
@@ -46,13 +56,21 @@ func (l *Local) Files(ctx context.Context) (seq iter.Seq[string]) {
 
 				filename := path.Join(dirPath, d.Name())
 
-				if !yield(filename) {
-					return io.EOF
-				}
+				worker <- filename
 				return nil
 			}
-
 		})
+	}()
+	return func(yield func(string) bool) {
+		defer func() {
+			closeCh <- struct{}{}
+			close(closeCh)
+		}()
+		for filename := range worker {
+			if !yield(filename) {
+				return
+			}
+		}
 	}
 }
 
