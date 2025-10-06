@@ -15,16 +15,15 @@ import (
 func Test_Local(t *testing.T) {
 	assertions := assert.New(t)
 
-	const TotalFiles = 1_000
 	files := func() (files []string) {
-		files = make([]string, TotalFiles)
+		files = make([]string, 100)
 		for index := range files {
 			files[index] = random.String(10)
 		}
 		return files
 	}()
 
-	randomRoot := filesystem.NewRandom(files, 1024)
+	randomRoot := filesystem.NewRandom(files, 32*1024*1024)
 
 	tempDir, err := os.MkdirTemp("", "*")
 	if !assertions.Nil(err, "failed to create temp") {

@@ -21,14 +21,14 @@ func Test_Copy(t *testing.T) {
 		assertions := assert.New(t)
 
 		files := func() (files []string) {
-			files = make([]string, 1_000)
+			files = make([]string, 100)
 			for index := range files {
 				files[index] = random.String(10)
 			}
 			return files
 		}()
 
-		src := filesystem.NewRandom(files, 1024)
+		src := filesystem.NewRandom(files, 32*1024*1024)
 
 		tempDir, err := os.MkdirTemp("", "*")
 		if !assertions.Nil(err, "failed create temporary directory") {

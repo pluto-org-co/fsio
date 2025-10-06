@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"iter"
-	"log"
 	"os"
 
 	"github.com/gabriel-vasile/mimetype"
@@ -57,15 +56,11 @@ func (g *Gzip) Open(ctx context.Context, filePath string) (rc io.ReadCloser, err
 	}
 
 	reader := io.MultiReader(bytes.NewReader(buffer.Bytes()), file)
-	log.Println("-------", mime)
 	if mime.Is("application/gzip") {
-		log.Println("Using gzip")
 		reader, err = gzip.NewReader(reader)
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare gzip reader: %w", err)
 		}
-	} else {
-		log.Println("Raw reader")
 	}
 
 	rc = &separateReadCloser{
@@ -154,7 +149,6 @@ loop:
 		return g.fs.WriteFile(ctx, filePath, compressedFile)
 	}
 
-	log.Println("Writing raw file")
 	return g.fs.WriteFile(ctx, filePath, rawFile)
 }
 
