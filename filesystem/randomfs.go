@@ -57,6 +57,8 @@ func (r *Random) Open(ctx context.Context, filePath string) (rc io.ReadCloser, e
 }
 
 func (r *Random) WriteFile(ctx context.Context, filePath string, src io.Reader) (err error) {
+	r.locations[filePath] = struct{}{}
+
 	const DefaultChunkSize = 1024 * 1024
 	dst := bufio.NewWriterSize(io.Discard, DefaultChunkSize)
 	defer dst.Flush()

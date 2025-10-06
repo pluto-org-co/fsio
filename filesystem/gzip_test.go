@@ -1,6 +1,7 @@
 package filesystem_test
 
 import (
+	"compress/gzip"
 	"context"
 	"os"
 	"testing"
@@ -12,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_Local(t *testing.T) {
+func Test_Gzip(t *testing.T) {
 	assertions := assert.New(t)
 
 	const TotalFiles = 1_000
@@ -40,6 +41,7 @@ func Test_Local(t *testing.T) {
 		return
 	}
 
-	t.Run("Testsuite", testsuite.TestFilesystem(t, localRoot))
+	gzipRoot := filesystem.NewGzip(gzip.BestCompression, localRoot)
 
+	t.Run("Testsuite", testsuite.TestFilesystem(t, gzipRoot))
 }
