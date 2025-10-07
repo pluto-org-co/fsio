@@ -91,7 +91,6 @@ func (g *Gzip) WriteFile(ctx context.Context, filePath string, src io.Reader) (e
 		return fmt.Errorf("failed to prepare  gzip writer: %w", err)
 	}
 
-	const DefaultBufferSize = 1024 * 1024 // 1MB
 	dst := bufio.NewWriterSize(io.MultiWriter(gzipWriter, rawFile), DefaultBufferSize)
 
 	switch src.(type) {

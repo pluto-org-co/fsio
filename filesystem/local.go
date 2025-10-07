@@ -131,7 +131,6 @@ func (l *Local) WriteFile(ctx context.Context, filePath string, src io.Reader) (
 		}()
 	}
 
-	const DefaultBufferSize = 1024 * 1024 // 1MB
 	switch src.(type) {
 	case *bufio.Reader:
 		break

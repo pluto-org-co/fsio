@@ -6,6 +6,8 @@ import (
 	"iter"
 )
 
+const DefaultBufferSize = 1024 * 1024
+
 type Filesystem interface {
 	// Returns the seq of all available files in the filesystem
 	Files(ctx context.Context) (seq iter.Seq[string])
