@@ -28,7 +28,6 @@ func Test_S3(t *testing.T) {
 	}()
 
 	randomRoot := filesystem.NewRandom(files, 32*1024*1024)
-	log.Println(randomRoot != nil)
 
 	ctxTc, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
