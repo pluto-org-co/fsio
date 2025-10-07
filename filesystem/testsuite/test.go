@@ -3,7 +3,6 @@ package testsuite
 import (
 	"bufio"
 	"context"
-	"crypto/rand"
 	"crypto/sha512"
 	"encoding/hex"
 	"io"
@@ -13,6 +12,8 @@ import (
 	"time"
 
 	"github.com/pluto-org-co/fsio/filesystem"
+	"github.com/pluto-org-co/fsio/ioutils"
+	"github.com/pluto-org-co/fsio/random"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -75,21 +76,24 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 				assertions := assert.New(t)
 
 				const fileSize = 100 * 1024 * 1024
-				randSrc := io.LimitReader(rand.Reader, fileSize)
+				randSrc := io.LimitReader(random.InsecureReader, fileSize)
 
 				checksumHash := sha512.New512_256()
-				randSrc = io.TeeReader(randSrc, checksumHash)
+				counter := ioutils.NewCountWriter(checksumHash)
+				randSrc = io.TeeReader(randSrc, counter)
 
 				ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 				defer cancel()
 
-				const targetFilename = "sub/location/temporary"
+				var targetFilename = GenerateFilename(5)
 
 				err := testFs.WriteFile(ctx, targetFilename, randSrc)
 				if !assertions.Nil(err, "failed to write random data to temporary file") {
 					return
 				}
 				defer testFs.RemoveAll(ctx, targetFilename)
+
+				t.Logf("WritFile Bytes count: %d", counter.Count())
 
 				checksum := hex.EncodeToString(checksumHash.Sum(nil))
 				t.Logf("Checksum: %s", checksum)
@@ -107,7 +111,8 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 					defer rc.Close()
 
 					lastChecksumHash := sha512.New512_256()
-					writer := bufio.NewWriter(lastChecksumHash)
+					counter := ioutils.NewCountWriter(lastChecksumHash)
+					writer := bufio.NewWriter(counter)
 
 					_, err = io.Copy(writer, bufio.NewReader(rc))
 					if !assertions.Nil(err, "failed to write to hash") {
@@ -118,6 +123,7 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 						return
 					}
 
+					t.Logf("Last checksum writes: %d", counter.Count())
 					lastChecksum := hex.EncodeToString(lastChecksumHash.Sum(nil))
 
 					assertions.Equal(checksum, lastChecksum, "checksums must match")
@@ -136,7 +142,7 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 					lastChecksumHash := sha512.New512_256()
 					randSrc := io.TeeReader(original, lastChecksumHash)
 
-					const targetFilename2 = "sub/location/temporary2"
+					var targetFilename2 = GenerateFilename(5)
 
 					writeCtx, cancel := context.WithTimeout(context.TODO(), time.Microsecond)
 					defer cancel()
@@ -151,7 +157,6 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 					if !assertions.NotEqual(checksum, lastChecksum, "checksums should not match because the write was incomplete/timed out") {
 						return
 					}
-
 				})
 			})
 		})

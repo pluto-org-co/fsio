@@ -4,26 +4,32 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"errors"
+	"crypto/sha512"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"iter"
 	"os"
+	"path"
+	"time"
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/minio/minio-go/v7"
+	"github.com/pluto-org-co/fsio/ioutils"
 )
 
 // Generic S3 filesystem
 type S3 struct {
-	client *minio.Client
-	bucket string
+	client      *minio.Client
+	bucket      string
+	cacheExpiry time.Duration
 }
 
-func NewS3(client *minio.Client, bucket string) (s *S3) {
+func NewS3(client *minio.Client, bucket string, cacheExpiry time.Duration) (s *S3) {
 	return &S3{
-		client: client,
-		bucket: bucket,
+		client:      client,
+		bucket:      bucket,
+		cacheExpiry: cacheExpiry,
 	}
 }
 
@@ -48,87 +54,92 @@ func (s *S3) Files(ctx context.Context) (seq iter.Seq[string]) {
 }
 
 func (s *S3) Open(ctx context.Context, filePath string) (rc io.ReadCloser, err error) {
-	options := minio.GetObjectOptions{}
+	rawFilePathChecksum := sha512.Sum512_256([]byte(filePath))
+	filePathChecksum := hex.EncodeToString(rawFilePathChecksum[:])
 
-	obj, err := s.client.GetObject(ctx, s.bucket, filePath, options)
+	cachedFilePath := path.Join(os.TempDir(), filePathChecksum)
+
+	cachedFile, err := os.Open(cachedFilePath)
+	if err == nil {
+		time.AfterFunc(s.cacheExpiry, func() {
+			cachedFile.Close()
+			os.Remove(cachedFilePath)
+		})
+		return cachedFile, nil
+	}
+
+	if os.IsExist(err) {
+		os.Remove(cachedFilePath)
+		return nil, fmt.Errorf("failed to open cached file: %w", err)
+	}
+
+	cachedFile, err = os.Create(cachedFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary file: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			cachedFile.Close()
+			os.Remove(cachedFilePath)
+		}
+	}()
+
+	obj, err := s.client.GetObject(ctx, s.bucket, filePath, minio.GetObjectOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get object: %w", err)
 	}
 
-	return obj, nil
-}
+	writer := bufio.NewWriterSize(cachedFile, DefaultBufferSize)
+	reader := bufio.NewReaderSize(obj, DefaultBufferSize)
 
-func (s *S3) WriteFile(ctx context.Context, filePath string, src io.Reader) (err error) {
-	temp, err := os.CreateTemp("", "*")
+	_, err = ioutils.CopyContext(ctx, writer, reader, DefaultBufferSize)
 	if err != nil {
-		return fmt.Errorf("failed to create temporary file: %w", err)
-	}
-	defer func() {
-		temp.Close()
-		os.RemoveAll(temp.Name())
-	}()
-
-	writer := bufio.NewWriter(temp)
-	var reader io.Reader
-	switch src.(type) {
-	case *bufio.Reader:
-		reader = src
-	default:
-		reader = bufio.NewReader(src)
-	}
-
-loop:
-	for {
-		select {
-		case <-ctx.Done():
-			err = ctx.Err()
-			if err != nil {
-				return fmt.Errorf("context error during copy: %w", err)
-			}
-			return nil
-		default:
-			_, err := io.CopyN(writer, reader, DefaultBufferSize)
-			if err != nil {
-				if !errors.Is(err, io.EOF) {
-					return fmt.Errorf("failed to copy chunk: %w", err)
-				}
-				break loop
-			}
-		}
+		return nil, fmt.Errorf("failed to copy contents: %w", err)
 	}
 
 	err = writer.Flush()
 	if err != nil {
-		return fmt.Errorf("failed to flush writer: %w", err)
+		return nil, fmt.Errorf("failed to flush writer: %w", err)
 	}
 
-	_, err = temp.Seek(0, 0)
+	_, err = cachedFile.Seek(0, 0)
 	if err != nil {
-		return fmt.Errorf("failed to seek to the begining of the file: %w", err)
+		return nil, fmt.Errorf("failed to reset file cursor: %w", err)
 	}
+	time.AfterFunc(s.cacheExpiry, func() {
+		cachedFile.Close()
+		os.Remove(cachedFilePath)
+	})
 
-	info, err := temp.Stat()
+	return cachedFile, nil
+}
+
+func (s *S3) WriteFile(ctx context.Context, filePath string, src io.Reader) (err error) {
+	srcAsFile, err := ReaderToTempFile(ctx, src)
+	if err != nil {
+		return fmt.Errorf("failed to ensure src is a file: %w", err)
+	}
+	defer srcAsFile.Close()
+
+	info, err := srcAsFile.Stat()
 	if err != nil {
 		return fmt.Errorf("failed to get temporary file info: %w", err)
 	}
 
-	tempReader := bufio.NewReaderSize(temp, DefaultBufferSize)
+	reader := bufio.NewReaderSize(srcAsFile, DefaultBufferSize)
 
 	var consumedBytes = bytes.NewBuffer(nil)
-	mime, err := mimetype.DetectReader(io.TeeReader(tempReader, consumedBytes))
+	mime, err := mimetype.DetectReader(io.TeeReader(reader, consumedBytes))
 	if err != nil {
 		return
 	}
 
-	options := minio.PutObjectOptions{
-		ContentType: mime.String(),
-	}
 	_, err = s.client.PutObject(
 		ctx,
 		s.bucket, filePath,
-		io.MultiReader(bytes.NewReader(consumedBytes.Bytes()), tempReader),
+		io.MultiReader(bytes.NewReader(consumedBytes.Bytes()), reader),
 		info.Size(),
-		options,
+		minio.PutObjectOptions{ContentType: mime.String()},
 	)
 	if err != nil {
 		return fmt.Errorf("failed to put object: %w", err)

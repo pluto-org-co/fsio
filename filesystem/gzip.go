@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"iter"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/klauspost/compress/gzip"
+	"github.com/pluto-org-co/fsio/ioutils"
 )
 
 type Gzip struct {
@@ -76,14 +76,14 @@ func (g *Gzip) WriteFile(ctx context.Context, filePath string, src io.Reader) (e
 		return fmt.Errorf("failed to create temporary raw file: %w", err)
 	}
 	defer rawFile.Close()
-	defer os.RemoveAll(rawFile.Name())
+	defer os.Remove(rawFile.Name())
 
 	compressedFile, err := os.CreateTemp("", "*")
 	if err != nil {
 		return fmt.Errorf("failed to create temporary gzip file: %w", err)
 	}
 	defer compressedFile.Close()
-	defer os.RemoveAll(compressedFile.Name())
+	defer os.Remove(compressedFile.Name())
 
 	// Gzip Writer
 	gzipWriter, err := gzip.NewWriterLevel(compressedFile, g.level)
@@ -100,24 +100,9 @@ func (g *Gzip) WriteFile(ctx context.Context, filePath string, src io.Reader) (e
 		src = bufio.NewReaderSize(src, DefaultBufferSize)
 	}
 
-loop:
-	for {
-		select {
-		case <-ctx.Done():
-			err = ctx.Err()
-			if err != nil {
-				return fmt.Errorf("context error during copy: %w", err)
-			}
-			return nil
-		default:
-			_, err := io.CopyN(dst, src, DefaultBufferSize)
-			if err != nil {
-				if !errors.Is(err, io.EOF) {
-					return fmt.Errorf("failed to copy chunk: %w", err)
-				}
-				break loop
-			}
-		}
+	_, err = ioutils.CopyContext(ctx, dst, src, DefaultBufferSize)
+	if err != nil {
+		return fmt.Errorf("failed to copy contents: %w", err)
 	}
 
 	err = dst.Flush()

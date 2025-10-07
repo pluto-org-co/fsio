@@ -3,7 +3,6 @@ package filesystem
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -13,6 +12,7 @@ import (
 	"path/filepath"
 
 	"github.com/charlievieth/fastwalk"
+	"github.com/pluto-org-co/fsio/ioutils"
 )
 
 type Local struct {
@@ -127,7 +127,7 @@ func (l *Local) WriteFile(ctx context.Context, filePath string, src io.Reader) (
 			if err == nil {
 				return
 			}
-			os.RemoveAll(file.Name())
+			os.Remove(file.Name())
 		}()
 	}
 
@@ -141,24 +141,11 @@ func (l *Local) WriteFile(ctx context.Context, filePath string, src io.Reader) (
 	dst := bufio.NewWriterSize(file, DefaultBufferSize)
 	defer dst.Flush()
 
-	for {
-		select {
-		case <-ctx.Done():
-			err = ctx.Err()
-			if err != nil {
-				return fmt.Errorf("context error during copy: %w", err)
-			}
-			return nil
-		default:
-			_, err := io.CopyN(dst, src, DefaultBufferSize)
-			if err != nil {
-				if errors.Is(err, io.EOF) {
-					return nil
-				}
-				return fmt.Errorf("failed to copy chunk: %w", err)
-			}
-		}
+	_, err = ioutils.CopyContext(ctx, dst, src, DefaultBufferSize)
+	if err != nil {
+		return fmt.Errorf("failed to copy contents: %w", err)
 	}
+	return err
 }
 
 func (l *Local) RemoveAll(ctx context.Context, filePath string) (err error) {
@@ -166,5 +153,5 @@ func (l *Local) RemoveAll(ctx context.Context, filePath string) (err error) {
 
 	realFilepath := path.Join(l.baseDirectory, filePath)
 
-	return os.RemoveAll(realFilepath)
+	return os.Remove(realFilepath)
 }

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/pluto-org-co/fsio/filesystem"
-	"github.com/pluto-org-co/fsio/random"
+	"github.com/pluto-org-co/fsio/filesystem/testsuite"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,13 +20,7 @@ func Test_Copy(t *testing.T) {
 
 		assertions := assert.New(t)
 
-		files := func() (files []string) {
-			files = make([]string, 100)
-			for index := range files {
-				files[index] = random.String(10)
-			}
-			return files
-		}()
+		files := testsuite.GenerateFilenames(100)
 
 		src := filesystem.NewRandom(files, 32*1024*1024)
 

@@ -10,7 +10,6 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/pluto-org-co/fsio/filesystem"
 	"github.com/pluto-org-co/fsio/filesystem/testsuite"
-	"github.com/pluto-org-co/fsio/random"
 	"github.com/stretchr/testify/assert"
 	"github.com/testcontainers/testcontainers-go"
 	miniotc "github.com/testcontainers/testcontainers-go/modules/minio"
@@ -19,13 +18,7 @@ import (
 func Test_S3(t *testing.T) {
 	assertions := assert.New(t)
 
-	files := func() (files []string) {
-		files = make([]string, 100)
-		for index := range files {
-			files[index] = random.String(10)
-		}
-		return files
-	}()
+	files := testsuite.GenerateFilenames(100)
 
 	randomRoot := filesystem.NewRandom(files, 32*1024*1024)
 
@@ -87,7 +80,7 @@ func Test_S3(t *testing.T) {
 		return
 	}
 
-	s3Root := filesystem.NewS3(client, bucketName)
+	s3Root := filesystem.NewS3(client, bucketName, time.Minute)
 
 	ctxCopy, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()

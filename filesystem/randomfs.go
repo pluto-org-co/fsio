@@ -3,12 +3,13 @@ package filesystem
 import (
 	"bufio"
 	"context"
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
 	"iter"
 	"os"
+
+	"github.com/pluto-org-co/fsio/random"
 )
 
 // Random read filesystem
@@ -52,7 +53,7 @@ func (r *Random) Open(ctx context.Context, filePath string) (rc io.ReadCloser, e
 		return nil, os.ErrNotExist
 	}
 
-	rc = io.NopCloser(bufio.NewReader(io.LimitReader(rand.Reader, r.fileSizes)))
+	rc = io.NopCloser(bufio.NewReader(io.LimitReader(random.InsecureReader, r.fileSizes)))
 	return rc, nil
 }
 
