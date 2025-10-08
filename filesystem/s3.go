@@ -114,16 +114,16 @@ func (s *S3) Open(ctx context.Context, filePath string) (rc io.ReadCloser, err e
 	return cachedFile, nil
 }
 
-func (s *S3) WriteFile(ctx context.Context, filePath string, src io.Reader) (err error) {
+func (s *S3) WriteFile(ctx context.Context, filePath string, src io.Reader) (filename string, err error) {
 	srcAsFile, err := ReaderToTempFile(ctx, src)
 	if err != nil {
-		return fmt.Errorf("failed to ensure src is a file: %w", err)
+		return filePath, fmt.Errorf("failed to ensure src is a file: %w", err)
 	}
 	defer srcAsFile.Close()
 
 	info, err := srcAsFile.Stat()
 	if err != nil {
-		return fmt.Errorf("failed to get temporary file info: %w", err)
+		return filePath, fmt.Errorf("failed to get temporary file info: %w", err)
 	}
 
 	reader := bufio.NewReaderSize(srcAsFile, DefaultBufferSize)
@@ -142,10 +142,10 @@ func (s *S3) WriteFile(ctx context.Context, filePath string, src io.Reader) (err
 		minio.PutObjectOptions{ContentType: mime.String()},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to put object: %w", err)
+		return filePath, fmt.Errorf("failed to put object: %w", err)
 	}
 
-	return nil
+	return filePath, nil
 }
 
 func (s *S3) RemoveAll(ctx context.Context, filePath string) (err error) {

@@ -15,7 +15,7 @@ func Copy(ctx context.Context, dst, src Filesystem) (err error) {
 			}
 			defer file.Close()
 
-			err = dst.WriteFile(ctx, filename, file)
+			_, err = dst.WriteFile(ctx, filename, file)
 			if err != nil {
 				return fmt.Errorf("failed to write dst file: %w", err)
 			}
@@ -56,7 +56,7 @@ func CopyWorkers(workersNumber int, ctx context.Context, dst, src Filesystem) (e
 					}
 					defer file.Close()
 
-					err = dst.WriteFile(ctx, filename, file)
+					_, err = dst.WriteFile(ctx, filename, file)
 					if err != nil {
 						return fmt.Errorf("failed to write dst file: %w", err)
 					}

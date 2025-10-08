@@ -85,9 +85,7 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 				ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 				defer cancel()
 
-				var targetFilename = GenerateFilename(5)
-
-				err := testFs.WriteFile(ctx, targetFilename, randSrc)
+				targetFilename, err := testFs.WriteFile(ctx, GenerateFilename(5), randSrc)
 				if !assertions.Nil(err, "failed to write random data to temporary file") {
 					return
 				}
@@ -146,7 +144,7 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 
 					writeCtx, cancel := context.WithTimeout(context.TODO(), time.Microsecond)
 					defer cancel()
-					err = testFs.WriteFile(writeCtx, targetFilename2, randSrc)
+					_, err = testFs.WriteFile(writeCtx, targetFilename2, randSrc)
 					defer testFs.RemoveAll(ctx, targetFilename2)
 
 					if !assertions.NotNil(err, "should fail to write file due to short timeout") {

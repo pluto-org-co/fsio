@@ -57,7 +57,7 @@ func (r *Random) Open(ctx context.Context, filePath string) (rc io.ReadCloser, e
 	return rc, nil
 }
 
-func (r *Random) WriteFile(ctx context.Context, filePath string, src io.Reader) (err error) {
+func (r *Random) WriteFile(ctx context.Context, filePath string, src io.Reader) (filename string, err error) {
 	r.locations[filePath] = struct{}{}
 
 	dst := bufio.NewWriterSize(io.Discard, DefaultBufferSize)
@@ -69,9 +69,9 @@ func (r *Random) WriteFile(ctx context.Context, filePath string, src io.Reader) 
 		_, err = io.CopyN(dst, src, DefaultBufferSize)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				return nil
+				return filePath, nil
 			}
-			return fmt.Errorf("failed to copy chunk: %w", err)
+			return filePath, fmt.Errorf("failed to copy chunk: %w", err)
 		}
 	}
 }

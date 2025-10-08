@@ -70,17 +70,17 @@ func (g *Gzip) Open(ctx context.Context, filePath string) (rc io.ReadCloser, err
 	return rc, nil
 }
 
-func (g *Gzip) WriteFile(ctx context.Context, filePath string, src io.Reader) (err error) {
+func (g *Gzip) WriteFile(ctx context.Context, filePath string, src io.Reader) (filename string, err error) {
 	rawFile, err := os.CreateTemp("", "*")
 	if err != nil {
-		return fmt.Errorf("failed to create temporary raw file: %w", err)
+		return filePath, fmt.Errorf("failed to create temporary raw file: %w", err)
 	}
 	defer rawFile.Close()
 	defer os.Remove(rawFile.Name())
 
 	compressedFile, err := os.CreateTemp("", "*")
 	if err != nil {
-		return fmt.Errorf("failed to create temporary gzip file: %w", err)
+		return filePath, fmt.Errorf("failed to create temporary gzip file: %w", err)
 	}
 	defer compressedFile.Close()
 	defer os.Remove(compressedFile.Name())
@@ -88,7 +88,7 @@ func (g *Gzip) WriteFile(ctx context.Context, filePath string, src io.Reader) (e
 	// Gzip Writer
 	gzipWriter, err := gzip.NewWriterLevel(compressedFile, g.level)
 	if err != nil {
-		return fmt.Errorf("failed to prepare  gzip writer: %w", err)
+		return filePath, fmt.Errorf("failed to prepare  gzip writer: %w", err)
 	}
 
 	dst := bufio.NewWriterSize(io.MultiWriter(gzipWriter, rawFile), DefaultBufferSize)
@@ -102,17 +102,17 @@ func (g *Gzip) WriteFile(ctx context.Context, filePath string, src io.Reader) (e
 
 	_, err = ioutils.CopyContext(ctx, dst, src, DefaultBufferSize)
 	if err != nil {
-		return fmt.Errorf("failed to copy contents: %w", err)
+		return filePath, fmt.Errorf("failed to copy contents: %w", err)
 	}
 
 	err = dst.Flush()
 	if err != nil {
-		return fmt.Errorf("failed to flush buffered writer: %w", err)
+		return filePath, fmt.Errorf("failed to flush buffered writer: %w", err)
 	}
 
 	err = gzipWriter.Close()
 	if err != nil {
-		return fmt.Errorf("failed to close gzip writer: %w", err)
+		return filePath, fmt.Errorf("failed to close gzip writer: %w", err)
 	}
 
 	// Write to target
@@ -121,12 +121,12 @@ func (g *Gzip) WriteFile(ctx context.Context, filePath string, src io.Reader) (e
 
 	rawInfo, err := rawFile.Stat()
 	if err != nil {
-		return fmt.Errorf("failed to get raw file info: %w", err)
+		return filePath, fmt.Errorf("failed to get raw file info: %w", err)
 	}
 
 	compressedInfo, err := compressedFile.Stat()
 	if err != nil {
-		return fmt.Errorf("failed to get compressed file info: %w", err)
+		return filePath, fmt.Errorf("failed to get compressed file info: %w", err)
 	}
 
 	if compressedInfo.Size() < rawInfo.Size() {

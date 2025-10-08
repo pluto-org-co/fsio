@@ -13,8 +13,10 @@ type Filesystem interface {
 	Files(ctx context.Context) (seq iter.Seq[string])
 	// Opens a reader for the passed file.
 	Open(ctx context.Context, filePath string) (rc io.ReadCloser, err error)
-	// Writes the reader to the dst filename
-	WriteFile(ctx context.Context, filePath string, src io.Reader) (err error)
+	// Writes the reader to the dst filePath.
+	// Returned filename is the actual name used during the write. Done this way since some implementation may alter the file name during
+	// normalization
+	WriteFile(ctx context.Context, filePath string, src io.Reader) (filename string, err error)
 	// Remove the path from the filesystem
 	RemoveAll(ctx context.Context, filePath string) (err error)
 }

@@ -84,7 +84,7 @@ func (l *Local) Open(_ context.Context, filename string) (rc io.ReadCloser, err 
 	return l.chdir.Open(filename)
 }
 
-func (l *Local) WriteFile(ctx context.Context, filePath string, src io.Reader) (err error) {
+func (l *Local) WriteFile(ctx context.Context, filePath string, src io.Reader) (filename string, err error) {
 	filePath = path.Clean(filePath)
 
 	realFilepath := path.Join(l.baseDirectory, filePath)
@@ -96,13 +96,13 @@ func (l *Local) WriteFile(ctx context.Context, filePath string, src io.Reader) (
 	case <-ctx.Done():
 		err = ctx.Err()
 		if err != nil {
-			return fmt.Errorf("context error during directory creation: %w", err)
+			return filePath, fmt.Errorf("context error during directory creation: %w", err)
 		}
-		return nil
+		return filePath, nil
 	default:
 		err = os.MkdirAll(dir, l.dirPerm)
 		if err != nil {
-			return fmt.Errorf("failed to create file directory: %w", err)
+			return filePath, fmt.Errorf("failed to create file directory: %w", err)
 		}
 	}
 
@@ -112,13 +112,13 @@ func (l *Local) WriteFile(ctx context.Context, filePath string, src io.Reader) (
 	case <-ctx.Done():
 		err = ctx.Err()
 		if err != nil {
-			return fmt.Errorf("context error during file creation: %w", err)
+			return filePath, fmt.Errorf("context error during file creation: %w", err)
 		}
-		return nil
+		return filePath, nil
 	default:
 		file, err = os.OpenFile(realFilepath, os.O_CREATE|os.O_WRONLY, l.filePerm)
 		if err != nil {
-			return fmt.Errorf("failed to create dst file: %w", err)
+			return filePath, fmt.Errorf("failed to create dst file: %w", err)
 		}
 		defer file.Close()
 
@@ -143,9 +143,9 @@ func (l *Local) WriteFile(ctx context.Context, filePath string, src io.Reader) (
 
 	_, err = ioutils.CopyContext(ctx, dst, src, DefaultBufferSize)
 	if err != nil {
-		return fmt.Errorf("failed to copy contents: %w", err)
+		return filePath, fmt.Errorf("failed to copy contents: %w", err)
 	}
-	return err
+	return filePath, nil
 }
 
 func (l *Local) RemoveAll(ctx context.Context, filePath string) (err error) {
