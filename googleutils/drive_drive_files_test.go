@@ -63,13 +63,13 @@ func Test_SeqDriveFiles(t *testing.T) {
 								for filename, file := range googleutils.SeqDriveFiles(ctx, svc, drive.Id) {
 									count++
 									if count%100 == 0 {
-										t.Logf("File: %s - %v", filename, file.Id)
+										t.Logf("[%d] File: %s - %v", count, filename, file.Id)
 									}
 								}
 							})
-							// if count > 0 {
-							// 	break
-							// }
+							if count > 0 {
+								break
+							}
 						}
 					})
 					if count > 0 {
