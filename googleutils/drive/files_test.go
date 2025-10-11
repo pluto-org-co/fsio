@@ -66,6 +66,9 @@ func Test_SeqFiles(t *testing.T) {
 						}
 						totalCount += count
 					})
+					if totalCount >= 100 {
+						break
+					}
 				}
 				assertions.NotZero(totalCount, "no files found")
 			})

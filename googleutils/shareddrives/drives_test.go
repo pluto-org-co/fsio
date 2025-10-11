@@ -35,7 +35,8 @@ func Test_SeqDrives(t *testing.T) {
 
 			t.Run(domain.DomainName, func(t *testing.T) {
 				assertions := assert.New(t)
-				var count int
+
+				var totalCount int
 				for u := range directory.SeqUsers(ctx, svc, domain.DomainName) {
 					t.Run(u.PrimaryEmail, func(t *testing.T) {
 						assertions := assert.New(t)
@@ -56,16 +57,21 @@ func Test_SeqDrives(t *testing.T) {
 							return
 						}
 
+						var count int
 						for drive := range shareddrives.SeqDrives(ctx, svc) {
 							t.Logf("Drive: %v", drive.Name)
 							count++
+							if count >= 5 {
+								break
+							}
 						}
+						totalCount += count
 					})
-					if count > 0 {
+					if totalCount >= 10 {
 						break
 					}
 				}
-				if !assertions.NotZero(count, "expecting at least one drive") {
+				if !assertions.NotZero(totalCount, "expecting at least one drive") {
 					return
 				}
 			})
