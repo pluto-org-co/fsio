@@ -1,12 +1,12 @@
-package googleutils_test
+package directory_test
 
 import (
 	"context"
 	"testing"
 	"time"
 
-	"github.com/pluto-org-co/fsio/googleutils"
 	"github.com/pluto-org-co/fsio/googleutils/creds"
+	"github.com/pluto-org-co/fsio/googleutils/directory"
 	"github.com/stretchr/testify/assert"
 	admin "google.golang.org/api/admin/directory/v1"
 	"google.golang.org/api/option"
@@ -28,7 +28,7 @@ func Test_SeqDomains(t *testing.T) {
 			return
 		}
 
-		for domain := range googleutils.SeqDomains(ctx, svc) {
+		for domain := range directory.SeqDomains(ctx, svc) {
 			t.Logf("Domain: %v", domain.DomainName)
 		}
 	})

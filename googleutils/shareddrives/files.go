@@ -1,4 +1,4 @@
-package googleutils
+package shareddrives
 
 import (
 	"context"
@@ -30,7 +30,7 @@ type gdFileListEntry struct {
 
 // List all the files in the passed directory using the call as reference factory
 func driveFilesFromFilesListCall(ctx context.Context, rootId string, baseCall func() *drive.FilesListCall) (seq iter.Seq2[string, *drive.File]) {
-	const MaxTimeouts = 5
+	const MaxTimeouts = 50
 	var timeouts int
 
 	var done atomic.Bool
@@ -53,18 +53,19 @@ func driveFilesFromFilesListCall(ctx context.Context, rootId string, baseCall fu
 				return
 			case <-ctx.Done():
 				return
-			case <-time.After(500 * time.Millisecond):
+			case <-time.After(100 * time.Millisecond):
 				timeouts++
 				if timeouts >= MaxTimeouts {
 					return
 				}
 			case pendingDir := <-pendingDirsCh:
 				timeouts = 0
-				// <-workers.Do(
 				go func() {
 					err := baseCall().
+						MaxResults(5_000).
 						Q(fmt.Sprintf("'%s' in parents", pendingDir.id)).
 						Pages(ctx, func(fl *drive.FileList) (err error) {
+							log.Println("LENGTH:", len(fl.Items))
 							if done.Load() {
 								return io.EOF
 							}
@@ -80,7 +81,6 @@ func driveFilesFromFilesListCall(ctx context.Context, rootId string, baseCall fu
 						return
 					}
 				}()
-				// )
 			case entry := <-fileListCh:
 				timeouts = 0
 				go func() {
@@ -127,7 +127,7 @@ func driveFilesFromFilesListCall(ctx context.Context, rootId string, baseCall fu
 }
 
 // List the files of the passed drive
-func SeqDriveFiles(ctx context.Context, svc *drive.Service, driveId string) (seq iter.Seq2[string, *drive.File]) {
+func SeqFiles(ctx context.Context, svc *drive.Service, driveId string) (seq iter.Seq2[string, *drive.File]) {
 	return driveFilesFromFilesListCall(ctx, driveId, func() (call *drive.FilesListCall) {
 		return svc.Files.
 			List().

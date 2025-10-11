@@ -1,4 +1,4 @@
-package googleutils
+package shareddrives
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 
 // List the drives that the account can access:
 // Requires at least: https://www.googleapis.com/auth/drive
-func SeqUserDrives(ctx context.Context, svc *drive.Service) (seq iter.Seq[*drive.Drive]) {
+func SeqDrives(ctx context.Context, svc *drive.Service) (seq iter.Seq[*drive.Drive]) {
 	var doneCh = make(chan struct{}, 1)
 	var drivesCh = make(chan *drive.DriveList, 1_000)
 

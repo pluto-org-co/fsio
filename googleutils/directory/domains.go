@@ -1,4 +1,4 @@
-package googleutils
+package directory
 
 import (
 	"context"

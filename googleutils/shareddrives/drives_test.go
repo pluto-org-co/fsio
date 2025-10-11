@@ -1,19 +1,20 @@
-package googleutils_test
+package shareddrives_test
 
 import (
 	"context"
 	"testing"
 	"time"
 
-	"github.com/pluto-org-co/fsio/googleutils"
 	"github.com/pluto-org-co/fsio/googleutils/creds"
+	"github.com/pluto-org-co/fsio/googleutils/directory"
+	"github.com/pluto-org-co/fsio/googleutils/shareddrives"
 	"github.com/stretchr/testify/assert"
 	admin "google.golang.org/api/admin/directory/v1"
 	"google.golang.org/api/drive/v2"
 	"google.golang.org/api/option"
 )
 
-func Test_SeqDriveFiles(t *testing.T) {
+func Test_SeqDrives(t *testing.T) {
 	t.Run("Succeed", func(t *testing.T) {
 		assertions := assert.New(t)
 
@@ -29,13 +30,13 @@ func Test_SeqDriveFiles(t *testing.T) {
 			return
 		}
 
-		for domain := range googleutils.SeqDomains(ctx, svc) {
+		for domain := range directory.SeqDomains(ctx, svc) {
 			t.Logf("Domain: %s", domain.DomainName)
 
 			t.Run(domain.DomainName, func(t *testing.T) {
 				assertions := assert.New(t)
 				var count int
-				for u := range googleutils.SeqUsers(ctx, svc, domain.DomainName) {
+				for u := range directory.SeqUsers(ctx, svc, domain.DomainName) {
 					t.Run(u.PrimaryEmail, func(t *testing.T) {
 						assertions := assert.New(t)
 
@@ -55,21 +56,9 @@ func Test_SeqDriveFiles(t *testing.T) {
 							return
 						}
 
-						for drive := range googleutils.SeqUserDrives(ctx, svc) {
+						for drive := range shareddrives.SeqDrives(ctx, svc) {
 							t.Logf("Drive: %v", drive.Name)
-							t.Run(drive.Name, func(t *testing.T) {
-								ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
-								defer cancel()
-								for filename, file := range googleutils.SeqDriveFiles(ctx, svc, drive.Id) {
-									count++
-									if count%100 == 0 {
-										t.Logf("[%d] File: %s - %v", count, filename, file.Id)
-									}
-								}
-							})
-							if count > 0 {
-								break
-							}
+							count++
 						}
 					})
 					if count > 0 {

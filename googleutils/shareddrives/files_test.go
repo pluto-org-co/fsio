@@ -1,19 +1,20 @@
-package googleutils_test
+package shareddrives_test
 
 import (
 	"context"
 	"testing"
 	"time"
 
-	"github.com/pluto-org-co/fsio/googleutils"
 	"github.com/pluto-org-co/fsio/googleutils/creds"
+	"github.com/pluto-org-co/fsio/googleutils/directory"
+	"github.com/pluto-org-co/fsio/googleutils/shareddrives"
 	"github.com/stretchr/testify/assert"
 	admin "google.golang.org/api/admin/directory/v1"
-	"google.golang.org/api/drive/v2"
+	gdrive "google.golang.org/api/drive/v2"
 	"google.golang.org/api/option"
 )
 
-func Test_SeqUserDrive(t *testing.T) {
+func Test_SeqFiles(t *testing.T) {
 	t.Run("Succeed", func(t *testing.T) {
 		assertions := assert.New(t)
 
@@ -29,20 +30,20 @@ func Test_SeqUserDrive(t *testing.T) {
 			return
 		}
 
-		for domain := range googleutils.SeqDomains(ctx, svc) {
+		for domain := range directory.SeqDomains(ctx, svc) {
 			t.Logf("Domain: %s", domain.DomainName)
 
 			t.Run(domain.DomainName, func(t *testing.T) {
 				assertions := assert.New(t)
 				var count int
-				for u := range googleutils.SeqUsers(ctx, svc, domain.DomainName) {
+				for u := range directory.SeqUsers(ctx, svc, domain.DomainName) {
 					t.Run(u.PrimaryEmail, func(t *testing.T) {
 						assertions := assert.New(t)
 
 						conf := creds.NewConfiguration(t,
 							admin.AdminDirectoryUserReadonlyScope,
 							admin.AdminDirectoryDomainReadonlyScope,
-							drive.DriveScope,
+							gdrive.DriveScope,
 						)
 						conf.Subject = u.PrimaryEmail
 
@@ -50,14 +51,26 @@ func Test_SeqUserDrive(t *testing.T) {
 						defer cancel()
 						client := conf.Client(ctx)
 
-						svc, err := drive.NewService(ctx, option.WithHTTPClient(client))
+						svc, err := gdrive.NewService(ctx, option.WithHTTPClient(client))
 						if !assertions.Nil(err, "failed to create service") {
 							return
 						}
 
-						for drive := range googleutils.SeqUserDrives(ctx, svc) {
-							t.Logf("Drive: %v", drive.Name)
-							count++
+						for driveEntry := range shareddrives.SeqDrives(ctx, svc) {
+							t.Logf("Drive: %v", driveEntry.Name)
+							t.Run(driveEntry.Name, func(t *testing.T) {
+								ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
+								defer cancel()
+								for filename, file := range shareddrives.SeqFiles(ctx, svc, driveEntry.Id) {
+									count++
+									if count%100 == 0 {
+										t.Logf("[%d] File: %s - %v", count, filename, file.Id)
+									}
+								}
+							})
+							if count > 0 {
+								break
+							}
 						}
 					})
 					if count > 0 {
