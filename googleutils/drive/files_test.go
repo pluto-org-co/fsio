@@ -1,0 +1,74 @@
+package drives_test
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/pluto-org-co/fsio/googleutils/creds"
+	"github.com/pluto-org-co/fsio/googleutils/directory"
+	drives "github.com/pluto-org-co/fsio/googleutils/drive"
+	"github.com/stretchr/testify/assert"
+	admin "google.golang.org/api/admin/directory/v1"
+	gdrive "google.golang.org/api/drive/v2"
+	"google.golang.org/api/option"
+)
+
+func Test_SeqFiles(t *testing.T) {
+	t.Run("Succeed", func(t *testing.T) {
+		assertions := assert.New(t)
+
+		conf := creds.NewConfiguration(t, admin.AdminDirectoryUserReadonlyScope, admin.AdminDirectoryDomainReadonlyScope)
+		conf.Subject = creds.UserEmail()
+
+		ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
+		defer cancel()
+		client := conf.Client(ctx)
+
+		svc, err := admin.NewService(ctx, option.WithHTTPClient(client))
+		if !assertions.Nil(err, "failed to create service") {
+			return
+		}
+
+		for domain := range directory.SeqDomains(ctx, svc) {
+			t.Logf("Domain: %s", domain.DomainName)
+
+			t.Run(domain.DomainName, func(t *testing.T) {
+				assertions := assert.New(t)
+				var totalCount int
+				for u := range directory.SeqUsers(ctx, svc, domain.DomainName) {
+					t.Run(u.PrimaryEmail, func(t *testing.T) {
+						assertions := assert.New(t)
+
+						conf := creds.NewConfiguration(t,
+							admin.AdminDirectoryUserReadonlyScope,
+							admin.AdminDirectoryDomainReadonlyScope,
+							gdrive.DriveScope,
+						)
+						conf.Subject = u.PrimaryEmail
+
+						ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
+						defer cancel()
+						client := conf.Client(ctx)
+
+						svc, err := gdrive.NewService(ctx, option.WithHTTPClient(client))
+						if !assertions.Nil(err, "failed to create service") {
+							return
+						}
+
+						var count int
+						for filename, file := range drives.SeqFiles(ctx, svc) {
+							t.Logf("[%d] File: %s - %v", count, filename, file.Id)
+							count++
+							if count >= 5 {
+								break
+							}
+						}
+						totalCount += count
+					})
+				}
+				assertions.NotZero(totalCount, "no files found")
+			})
+		}
+	})
+}
