@@ -7,10 +7,10 @@ import (
 
 	"github.com/pluto-org-co/fsio/googleutils/creds"
 	"github.com/pluto-org-co/fsio/googleutils/directory"
-	drives "github.com/pluto-org-co/fsio/googleutils/drive"
+	"github.com/pluto-org-co/fsio/googleutils/drives"
 	"github.com/stretchr/testify/assert"
 	admin "google.golang.org/api/admin/directory/v1"
-	gdrive "google.golang.org/api/drive/v2"
+	gdrive "google.golang.org/api/drive/v3"
 	"google.golang.org/api/option"
 )
 
@@ -25,18 +25,18 @@ func Test_SeqFiles(t *testing.T) {
 		defer cancel()
 		client := conf.Client(ctx)
 
-		svc, err := admin.NewService(ctx, option.WithHTTPClient(client))
+		adminSvc, err := admin.NewService(ctx, option.WithHTTPClient(client))
 		if !assertions.Nil(err, "failed to create service") {
 			return
 		}
 
-		for domain := range directory.SeqDomains(ctx, svc) {
+		for domain := range directory.SeqDomains(ctx, adminSvc) {
 			t.Logf("Domain: %s", domain.DomainName)
 
 			t.Run(domain.DomainName, func(t *testing.T) {
 				assertions := assert.New(t)
 				var totalCount int
-				for u := range directory.SeqUsers(ctx, svc, domain.DomainName) {
+				for u := range directory.SeqUsers(ctx, adminSvc, domain.DomainName) {
 					t.Run(u.PrimaryEmail, func(t *testing.T) {
 						assertions := assert.New(t)
 
@@ -51,13 +51,13 @@ func Test_SeqFiles(t *testing.T) {
 						defer cancel()
 						client := conf.Client(ctx)
 
-						svc, err := gdrive.NewService(ctx, option.WithHTTPClient(client))
+						driveSvc, err := gdrive.NewService(ctx, option.WithHTTPClient(client))
 						if !assertions.Nil(err, "failed to create service") {
 							return
 						}
 
 						var count int
-						for filename, file := range drives.SeqFiles(ctx, svc) {
+						for filename, file := range drives.SeqFiles(ctx, driveSvc) {
 							t.Logf("[%d] File: %s - %v", count, filename, file.Id)
 							count++
 							if count >= 5 {

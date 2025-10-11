@@ -5,7 +5,7 @@ import (
 	"iter"
 
 	"github.com/pluto-org-co/fsio/googleutils/driveutils"
-	"google.golang.org/api/drive/v2"
+	"google.golang.org/api/drive/v3"
 )
 
 // List the files of the passed drive

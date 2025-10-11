@@ -10,7 +10,7 @@ import (
 	"github.com/pluto-org-co/fsio/googleutils/shareddrives"
 	"github.com/stretchr/testify/assert"
 	admin "google.golang.org/api/admin/directory/v1"
-	"google.golang.org/api/drive/v2"
+	"google.golang.org/api/drive/v3"
 	"google.golang.org/api/option"
 )
 
@@ -25,19 +25,19 @@ func Test_SeqDrives(t *testing.T) {
 		defer cancel()
 		client := conf.Client(ctx)
 
-		svc, err := admin.NewService(ctx, option.WithHTTPClient(client))
+		adminSvc, err := admin.NewService(ctx, option.WithHTTPClient(client))
 		if !assertions.Nil(err, "failed to create service") {
 			return
 		}
 
-		for domain := range directory.SeqDomains(ctx, svc) {
+		for domain := range directory.SeqDomains(ctx, adminSvc) {
 			t.Logf("Domain: %s", domain.DomainName)
 
 			t.Run(domain.DomainName, func(t *testing.T) {
 				assertions := assert.New(t)
 
 				var totalCount int
-				for u := range directory.SeqUsers(ctx, svc, domain.DomainName) {
+				for u := range directory.SeqUsers(ctx, adminSvc, domain.DomainName) {
 					t.Run(u.PrimaryEmail, func(t *testing.T) {
 						assertions := assert.New(t)
 
@@ -52,13 +52,13 @@ func Test_SeqDrives(t *testing.T) {
 						defer cancel()
 						client := conf.Client(ctx)
 
-						svc, err := drive.NewService(ctx, option.WithHTTPClient(client))
+						driveSvc, err := drive.NewService(ctx, option.WithHTTPClient(client))
 						if !assertions.Nil(err, "failed to create service") {
 							return
 						}
 
 						var count int
-						for drive := range shareddrives.SeqDrives(ctx, svc) {
+						for drive := range shareddrives.SeqDrives(ctx, driveSvc) {
 							t.Logf("Drive: %v", drive.Name)
 							count++
 							if count >= 5 {

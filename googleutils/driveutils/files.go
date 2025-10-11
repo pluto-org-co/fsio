@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"google.golang.org/api/drive/v2"
+	"google.golang.org/api/drive/v3"
 )
 
 type gdFileEntry struct {
@@ -61,8 +61,9 @@ func SeqFilesFromFilesListCall(ctx context.Context, rootId string, baseCall func
 				timeouts = 0
 				go func() {
 					err := baseCall().
-						MaxResults(5_000).
+						PageSize(1_000).
 						Q(fmt.Sprintf("'%s' in parents", pendingDir.id)).
+						Fields("nextPageToken,files(id,name,fullFileExtension,mimeType)").
 						Pages(ctx, func(fl *drive.FileList) (err error) {
 							if done.Load() {
 								return io.EOF
@@ -81,15 +82,12 @@ func SeqFilesFromFilesListCall(ctx context.Context, rootId string, baseCall func
 			case entry := <-fileListCh:
 				timeouts = 0
 				go func() {
-					for _, file := range entry.filelist.Items {
+					for _, file := range entry.filelist.Files {
 						if done.Load() {
 							return
 						}
 
-						var filename string = path.Join(entry.dirEntry.asPrefix, file.Title)
-						if file.FullFileExtension != "" {
-							filename += "." + file.FullFileExtension
-						}
+						var filename string = path.Join(entry.dirEntry.asPrefix, file.Name)
 
 						if file.MimeType == "application/vnd.google-apps.folder" {
 							pendingDirsCh <- &gdDirEntry{

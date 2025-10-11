@@ -5,7 +5,7 @@ import (
 	"io"
 	"iter"
 
-	"google.golang.org/api/drive/v2"
+	"google.golang.org/api/drive/v3"
 )
 
 // List the drives that the account can access:
@@ -36,7 +36,7 @@ func SeqDrives(ctx context.Context, svc *drive.Service) (seq iter.Seq[*drive.Dri
 		defer close(doneCh)
 
 		for driveList := range drivesCh {
-			for _, drive := range driveList.Items {
+			for _, drive := range driveList.Drives {
 				if !yield(drive) {
 					doneCh <- struct{}{}
 					return
