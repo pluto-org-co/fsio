@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"sync"
+
+	"github.com/pluto-org-co/fsio/syncutils"
 )
 
 func Copy(ctx context.Context, dst, src Filesystem) (err error) {
@@ -30,10 +32,8 @@ func Copy(ctx context.Context, dst, src Filesystem) (err error) {
 }
 
 func CopyWorkers(workersNumber int, ctx context.Context, dst, src Filesystem) (err error) {
-	workers := make(chan struct{}, workersNumber)
-	for range workersNumber {
-		workers <- struct{}{}
-	}
+	workers := syncutils.NewWorkers(workersNumber)
+	defer workers.Close()
 
 	errorsCh := make(chan error, workersNumber)
 	defer close(errorsCh)
@@ -42,13 +42,18 @@ func CopyWorkers(workersNumber int, ctx context.Context, dst, src Filesystem) (e
 	defer wg.Wait()
 	for filename := range src.Files(ctx) {
 		select {
-		case <-workers:
-			wg.Add(1)
-			go func() {
-				defer func() {
-					workers <- struct{}{}
-					wg.Done()
-				}()
+		case err = <-errorsCh:
+			return fmt.Errorf("errors during copy: %w", err)
+		case <-ctx.Done():
+			err = ctx.Err()
+			if err != nil {
+				return fmt.Errorf("context error: %w", err)
+			}
+			return nil
+		case <-workers.Get():
+			wg.Go(func() {
+				defer workers.Put()
+
 				err = func() (err error) {
 					file, err := src.Open(ctx, filename)
 					if err != nil {
@@ -66,10 +71,9 @@ func CopyWorkers(workersNumber int, ctx context.Context, dst, src Filesystem) (e
 				if err != nil {
 					errorsCh <- fmt.Errorf("failed to copy: %s: %w", filename, err)
 				}
-			}()
-		case err = <-errorsCh:
-			return fmt.Errorf("errors during copy: %w", err)
+			})
 		}
 	}
+
 	return nil
 }
