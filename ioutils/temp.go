@@ -1,4 +1,4 @@
-package filesystem
+package ioutils
 
 import (
 	"bufio"
@@ -7,8 +7,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-
-	"github.com/pluto-org-co/fsio/ioutils"
 )
 
 type SelfdestructionFile struct {
@@ -54,7 +52,7 @@ func ReaderToTempFile(ctx context.Context, src io.Reader) (file fs.File, err err
 			reader = bufio.NewReader(src)
 		}
 
-		_, err = ioutils.CopyContext(ctx, writer, reader, DefaultBufferSize)
+		_, err = CopyContext(ctx, writer, reader, DefaultBufferSize)
 		if err != nil {
 			return nil, fmt.Errorf("failed to copy contents: %w", err)
 		}

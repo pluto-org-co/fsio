@@ -91,16 +91,16 @@ func (g *Gzip) WriteFile(ctx context.Context, filePath string, src io.Reader) (f
 		return filePath, fmt.Errorf("failed to prepare  gzip writer: %w", err)
 	}
 
-	dst := bufio.NewWriterSize(io.MultiWriter(gzipWriter, rawFile), DefaultBufferSize)
+	dst := bufio.NewWriterSize(io.MultiWriter(gzipWriter, rawFile), ioutils.DefaultBufferSize)
 
 	switch src.(type) {
 	case *bufio.Reader:
 		break
 	default:
-		src = bufio.NewReaderSize(src, DefaultBufferSize)
+		src = bufio.NewReaderSize(src, ioutils.DefaultBufferSize)
 	}
 
-	_, err = ioutils.CopyContext(ctx, dst, src, DefaultBufferSize)
+	_, err = ioutils.CopyContext(ctx, dst, src, ioutils.DefaultBufferSize)
 	if err != nil {
 		return filePath, fmt.Errorf("failed to copy contents: %w", err)
 	}

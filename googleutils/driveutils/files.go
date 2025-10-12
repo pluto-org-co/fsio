@@ -82,6 +82,11 @@ func SeqFilesFromFilesListCall(ctx context.Context, rootId string, baseCall func
 			case entry := <-fileListCh:
 				timeouts = 0
 				go func() {
+					defer func() {
+						if err := recover(); err != nil {
+							// TODO: Log on DEV builds
+						}
+					}()
 					for _, file := range entry.filelist.Files {
 						if done.Load() {
 							return

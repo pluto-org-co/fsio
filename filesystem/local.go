@@ -135,13 +135,13 @@ func (l *Local) WriteFile(ctx context.Context, filePath string, src io.Reader) (
 	case *bufio.Reader:
 		break
 	default:
-		src = bufio.NewReaderSize(src, DefaultBufferSize)
+		src = bufio.NewReaderSize(src, ioutils.DefaultBufferSize)
 	}
 
-	dst := bufio.NewWriterSize(file, DefaultBufferSize)
+	dst := bufio.NewWriterSize(file, ioutils.DefaultBufferSize)
 	defer dst.Flush()
 
-	_, err = ioutils.CopyContext(ctx, dst, src, DefaultBufferSize)
+	_, err = ioutils.CopyContext(ctx, dst, src, ioutils.DefaultBufferSize)
 	if err != nil {
 		return filePath, fmt.Errorf("failed to copy contents: %w", err)
 	}

@@ -89,10 +89,10 @@ func (s *S3) Open(ctx context.Context, filePath string) (rc io.ReadCloser, err e
 		return nil, fmt.Errorf("failed to get object: %w", err)
 	}
 
-	writer := bufio.NewWriterSize(cachedFile, DefaultBufferSize)
-	reader := bufio.NewReaderSize(obj, DefaultBufferSize)
+	writer := bufio.NewWriterSize(cachedFile, ioutils.DefaultBufferSize)
+	reader := bufio.NewReaderSize(obj, ioutils.DefaultBufferSize)
 
-	_, err = ioutils.CopyContext(ctx, writer, reader, DefaultBufferSize)
+	_, err = ioutils.CopyContext(ctx, writer, reader, ioutils.DefaultBufferSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to copy contents: %w", err)
 	}
@@ -115,7 +115,7 @@ func (s *S3) Open(ctx context.Context, filePath string) (rc io.ReadCloser, err e
 }
 
 func (s *S3) WriteFile(ctx context.Context, filePath string, src io.Reader) (filename string, err error) {
-	srcAsFile, err := ReaderToTempFile(ctx, src)
+	srcAsFile, err := ioutils.ReaderToTempFile(ctx, src)
 	if err != nil {
 		return filePath, fmt.Errorf("failed to ensure src is a file: %w", err)
 	}
@@ -126,7 +126,7 @@ func (s *S3) WriteFile(ctx context.Context, filePath string, src io.Reader) (fil
 		return filePath, fmt.Errorf("failed to get temporary file info: %w", err)
 	}
 
-	reader := bufio.NewReaderSize(srcAsFile, DefaultBufferSize)
+	reader := bufio.NewReaderSize(srcAsFile, ioutils.DefaultBufferSize)
 
 	var consumedBytes = bytes.NewBuffer(nil)
 	mime, err := mimetype.DetectReader(io.TeeReader(reader, consumedBytes))

@@ -9,6 +9,7 @@ import (
 	"iter"
 	"os"
 
+	"github.com/pluto-org-co/fsio/ioutils"
 	"github.com/pluto-org-co/fsio/random"
 )
 
@@ -60,13 +61,13 @@ func (r *Random) Open(ctx context.Context, filePath string) (rc io.ReadCloser, e
 func (r *Random) WriteFile(ctx context.Context, filePath string, src io.Reader) (filename string, err error) {
 	r.locations[filePath] = struct{}{}
 
-	dst := bufio.NewWriterSize(io.Discard, DefaultBufferSize)
+	dst := bufio.NewWriterSize(io.Discard, ioutils.DefaultBufferSize)
 	defer dst.Flush()
 
-	src = bufio.NewReaderSize(src, DefaultBufferSize)
+	src = bufio.NewReaderSize(src, ioutils.DefaultBufferSize)
 
 	for {
-		_, err = io.CopyN(dst, src, DefaultBufferSize)
+		_, err = io.CopyN(dst, src, ioutils.DefaultBufferSize)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				return filePath, nil
