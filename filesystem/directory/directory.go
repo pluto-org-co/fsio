@@ -3,7 +3,7 @@ package directory
 import (
 	"bufio"
 	"context"
-	"crypto/sha512"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -39,14 +39,14 @@ func New(root string, dirPerm, filePerm fs.FileMode) (l *Directory) {
 
 var _ filesystem.Filesystem = (*Directory)(nil)
 
-func (l *Directory) Checksum(ctx context.Context, filePath string) (checksum string, err error) {
+func (l *Directory) ChecksumSha256(ctx context.Context, filePath string) (checksum string, err error) {
 	file, err := l.Open(ctx, filePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to open file: %w", err)
 	}
 	defer file.Close()
 
-	hash := sha512.New512_256()
+	hash := sha256.New()
 	_, err = ioutils.CopyContext(ctx, hash, bufio.NewReaderSize(file, ioutils.DefaultBufferSize), ioutils.DefaultBufferSize)
 	if err != nil {
 		return "", fmt.Errorf("failed to compute hash: %w", err)

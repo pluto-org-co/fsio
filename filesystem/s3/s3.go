@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
 	"fmt"
@@ -36,7 +37,7 @@ func New(client *minio.Client, bucket string, cacheExpiry time.Duration) (s *S3)
 
 var _ filesystem.Filesystem = (*S3)(nil)
 
-func (s *S3) Checksum(ctx context.Context, filePath string) (checksum string, err error) {
+func (s *S3) ChecksumSha256(ctx context.Context, filePath string) (checksum string, err error) {
 	options := minio.StatObjectOptions{
 		Checksum: true,
 	}
@@ -56,7 +57,7 @@ func (s *S3) Checksum(ctx context.Context, filePath string) (checksum string, er
 	}
 	defer file.Close()
 
-	hash := sha512.New512_256()
+	hash := sha256.New()
 	_, err = ioutils.CopyContext(ctx, hash, bufio.NewReaderSize(file, ioutils.DefaultBufferSize), ioutils.DefaultBufferSize)
 	if err != nil {
 		return "", fmt.Errorf("failed to compute hash: %w", err)
@@ -172,7 +173,7 @@ func (s *S3) WriteFile(ctx context.Context, filePath string, src io.Reader) (fil
 		info.Size(),
 		minio.PutObjectOptions{
 			ContentType:  mime.String(),
-			AutoChecksum: minio.ChecksumCRC32,
+			AutoChecksum: minio.ChecksumSHA256,
 		},
 	)
 

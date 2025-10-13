@@ -1,10 +1,7 @@
 package googledrive
 
 import (
-	"bufio"
 	"context"
-	"crypto/sha512"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -17,7 +14,6 @@ import (
 	"github.com/pluto-org-co/fsio/googleutils/directory"
 	"github.com/pluto-org-co/fsio/googleutils/drives"
 	"github.com/pluto-org-co/fsio/googleutils/shareddrives"
-	"github.com/pluto-org-co/fsio/ioutils"
 	"golang.org/x/oauth2/jwt"
 	admin "google.golang.org/api/admin/directory/v1"
 	"google.golang.org/api/drive/v3"
@@ -108,20 +104,68 @@ func (g *GoogleDrive) filenameIsUserAccountDrive(filename string) (ok bool, doma
 	return false, "", "", ""
 }
 
-func (g *GoogleDrive) Checksum(ctx context.Context, filePath string) (checksum string, err error) {
-	file, err := g.Open(ctx, filePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to open file: %w", err)
-	}
-	defer file.Close()
+func (g *GoogleDrive) ChecksumSha256(ctx context.Context, filePath string) (checksum string, err error) {
+	baseConf := g.jwtLoader()
+	baseClient := baseConf.Client(ctx)
 
-	hash := sha512.New512_256()
-	_, err = ioutils.CopyContext(ctx, hash, bufio.NewReaderSize(file, ioutils.DefaultBufferSize), ioutils.DefaultBufferSize)
+	driveSvc, err := drive.NewService(ctx, option.WithHTTPClient(baseClient))
 	if err != nil {
-		return "", fmt.Errorf("failed to compute hash: %w", err)
+		return "", fmt.Errorf("failed to create service: %w", err)
 	}
 
-	checksum = hex.EncodeToString(hash.Sum(nil))
+	if g.currentAccount {
+		ok, filename := g.filenameIsCurrentUser(filePath)
+		if ok {
+			checksum, err := drives.Checksum(ctx, driveSvc, filename)
+			if err != nil {
+				return "", fmt.Errorf("failed to calculate checksum for current user filename: %w", err)
+			}
+			return checksum, nil
+		}
+	}
+
+	if g.sharedDrives {
+		ok, driveName, filename := g.filenameIsCurrentSharedDrives(filePath)
+
+		var driveId string
+		for drive := range shareddrives.SeqDrives(ctx, driveSvc) {
+			if drive.Name == driveName {
+				driveId = drive.Id
+				break
+			}
+		}
+
+		if driveId == "" {
+			return "", fmt.Errorf("drive not found by its name: %s", driveName)
+		}
+
+		if ok {
+			checksum, err := shareddrives.Checksum(ctx, driveSvc, driveId, filename)
+			if err != nil {
+				return "", fmt.Errorf("failed to calculate checksum for current user filename: %w", err)
+			}
+			return checksum, nil
+		}
+	}
+
+	if g.otherUsers {
+		ok, _, username, filename := g.filenameIsUserAccountDrive(filePath)
+		if ok {
+			baseConf := g.jwtLoader()
+			baseConf.Subject = username
+
+			driveSvc, err := drive.NewService(ctx, option.WithHTTPClient(baseConf.Client(ctx)))
+			if err != nil {
+				return "", fmt.Errorf("failed to create drive service: %w", err)
+			}
+
+			checksum, err := drives.Checksum(ctx, driveSvc, filename)
+			if err != nil {
+				return "", fmt.Errorf("failed to calculate checksum for user filename: %s: %w", username, err)
+			}
+			return checksum, nil
+		}
+	}
 
 	return checksum, nil
 }

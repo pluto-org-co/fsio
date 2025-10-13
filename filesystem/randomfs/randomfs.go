@@ -3,7 +3,7 @@ package randomfs
 import (
 	"bufio"
 	"context"
-	"crypto/sha512"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -36,14 +36,14 @@ func New(locations []string, fileSizes int64) (r *Random) {
 
 var _ filesystem.Filesystem = (*Random)(nil)
 
-func (r *Random) Checksum(ctx context.Context, filePath string) (checksum string, err error) {
+func (r *Random) ChecksumSha256(ctx context.Context, filePath string) (checksum string, err error) {
 	file, err := r.Open(ctx, filePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to open file: %w", err)
 	}
 	defer file.Close()
 
-	hash := sha512.New512_256()
+	hash := sha256.New()
 	_, err = ioutils.CopyContext(ctx, hash, bufio.NewReaderSize(file, ioutils.DefaultBufferSize), ioutils.DefaultBufferSize)
 	if err != nil {
 		return "", fmt.Errorf("failed to compute hash: %w", err)

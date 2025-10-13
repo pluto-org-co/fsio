@@ -3,7 +3,7 @@ package testsuite
 import (
 	"bufio"
 	"context"
-	"crypto/sha512"
+	"crypto/sha256"
 	"encoding/hex"
 	"io"
 	"iter"
@@ -78,7 +78,7 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 				const fileSize = 100 * 1024 * 1024
 				randSrc := io.LimitReader(random.InsecureReader, fileSize)
 
-				checksumHash := sha512.New512_256()
+				checksumHash := sha256.New()
 				counter := ioutils.NewCountWriter(checksumHash)
 				randSrc = io.TeeReader(randSrc, counter)
 
@@ -96,7 +96,7 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 				checksum := hex.EncodeToString(checksumHash.Sum(nil))
 				t.Logf("Checksum: %s", checksum)
 
-				computedChecksum, err := testFs.Checksum(ctx, targetFilename)
+				computedChecksum, err := testFs.ChecksumSha256(ctx, targetFilename)
 				if !assertions.Nil(err, "failed to compute file checksum") {
 					return
 				}
@@ -118,7 +118,7 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 					}
 					defer rc.Close()
 
-					lastChecksumHash := sha512.New512_256()
+					lastChecksumHash := sha256.New()
 					counter := ioutils.NewCountWriter(lastChecksumHash)
 					writer := bufio.NewWriter(counter)
 
@@ -147,7 +147,7 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 					}
 					defer original.Close()
 
-					lastChecksumHash := sha512.New512_256()
+					lastChecksumHash := sha256.New()
 					randSrc := io.TeeReader(original, lastChecksumHash)
 
 					var targetFilename2 = GenerateFilename(5)
