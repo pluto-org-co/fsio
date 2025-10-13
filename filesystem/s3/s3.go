@@ -1,4 +1,4 @@
-package filesystem
+package s3
 
 import (
 	"bufio"
@@ -15,6 +15,7 @@ import (
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/minio/minio-go/v7"
+	"github.com/pluto-org-co/fsio/filesystem"
 	"github.com/pluto-org-co/fsio/ioutils"
 )
 
@@ -25,7 +26,7 @@ type S3 struct {
 	cacheExpiry time.Duration
 }
 
-func NewS3(client *minio.Client, bucket string, cacheExpiry time.Duration) (s *S3) {
+func New(client *minio.Client, bucket string, cacheExpiry time.Duration) (s *S3) {
 	return &S3{
 		client:      client,
 		bucket:      bucket,
@@ -33,7 +34,7 @@ func NewS3(client *minio.Client, bucket string, cacheExpiry time.Duration) (s *S
 	}
 }
 
-var _ Filesystem = (*S3)(nil)
+var _ filesystem.Filesystem = (*S3)(nil)
 
 func (s *S3) Files(ctx context.Context) (seq iter.Seq[string]) {
 	options := minio.ListObjectsOptions{}

@@ -1,9 +1,11 @@
-package filesystem
+package pathmod
 
 import (
 	"context"
 	"io"
 	"iter"
+
+	"github.com/pluto-org-co/fsio/filesystem"
 )
 
 type PathModFunc func(oldNew string) (newPath string)
@@ -11,11 +13,11 @@ type PathModFunc func(oldNew string) (newPath string)
 // This FS modifies the path passed to the underlying Filesystem based on a modification function.
 // Listing files works as normal. The path modification is performed for every WriteFile.
 type PathMod struct {
-	fs Filesystem
+	fs filesystem.Filesystem
 	f  PathModFunc
 }
 
-var _ Filesystem = (*PathMod)(nil)
+var _ filesystem.Filesystem = (*PathMod)(nil)
 
 func (p *PathMod) Files(ctx context.Context) (seq iter.Seq[string]) {
 	return p.fs.Files(ctx)
@@ -33,7 +35,7 @@ func (p *PathMod) RemoveAll(ctx context.Context, filePath string) (err error) {
 	return p.fs.RemoveAll(ctx, filePath)
 }
 
-func NewPathMod(fs Filesystem, f PathModFunc) (p *PathMod) {
+func New(fs filesystem.Filesystem, f PathModFunc) (p *PathMod) {
 	return &PathMod{
 		fs: fs,
 		f:  f,

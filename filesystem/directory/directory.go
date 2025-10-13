@@ -1,4 +1,4 @@
-package filesystem
+package directory
 
 import (
 	"bufio"
@@ -12,10 +12,11 @@ import (
 	"path/filepath"
 
 	"github.com/charlievieth/fastwalk"
+	"github.com/pluto-org-co/fsio/filesystem"
 	"github.com/pluto-org-co/fsio/ioutils"
 )
 
-type Local struct {
+type Directory struct {
 	dirPerm       fs.FileMode
 	filePerm      fs.FileMode
 	baseDirectory string
@@ -25,8 +26,8 @@ type Local struct {
 // Creates a new Local Filesystem, Root is the directory only have access to.
 // dirPerm corresponds to the permissions used when creating new directories.
 // filePerm corresponds to the permissions used when creating a new.
-func NewLocal(root string, dirPerm, filePerm fs.FileMode) (l *Local) {
-	return &Local{
+func New(root string, dirPerm, filePerm fs.FileMode) (l *Directory) {
+	return &Directory{
 		filePerm:      filePerm,
 		dirPerm:       dirPerm,
 		baseDirectory: root,
@@ -34,9 +35,9 @@ func NewLocal(root string, dirPerm, filePerm fs.FileMode) (l *Local) {
 	}
 }
 
-var _ Filesystem = (*Local)(nil)
+var _ filesystem.Filesystem = (*Directory)(nil)
 
-func (l *Local) Files(ctx context.Context) (seq iter.Seq[string]) {
+func (l *Directory) Files(ctx context.Context) (seq iter.Seq[string]) {
 	conf := fastwalk.DefaultConfig
 
 	worker := make(chan string, 1_000)
@@ -80,11 +81,11 @@ func (l *Local) Files(ctx context.Context) (seq iter.Seq[string]) {
 	}
 }
 
-func (l *Local) Open(_ context.Context, filename string) (rc io.ReadCloser, err error) {
+func (l *Directory) Open(_ context.Context, filename string) (rc io.ReadCloser, err error) {
 	return l.chdir.Open(filename)
 }
 
-func (l *Local) WriteFile(ctx context.Context, filePath string, src io.Reader) (filename string, err error) {
+func (l *Directory) WriteFile(ctx context.Context, filePath string, src io.Reader) (filename string, err error) {
 	filePath = path.Clean(filePath)
 
 	realFilepath := path.Join(l.baseDirectory, filePath)
@@ -148,7 +149,7 @@ func (l *Local) WriteFile(ctx context.Context, filePath string, src io.Reader) (
 	return filePath, nil
 }
 
-func (l *Local) RemoveAll(ctx context.Context, filePath string) (err error) {
+func (l *Directory) RemoveAll(ctx context.Context, filePath string) (err error) {
 	filePath = path.Clean(filePath)
 
 	realFilepath := path.Join(l.baseDirectory, filePath)

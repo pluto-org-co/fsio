@@ -1,4 +1,4 @@
-package filesystem_test
+package googledrive_test
 
 import (
 	"bufio"
@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pluto-org-co/fsio/filesystem"
+	"github.com/pluto-org-co/fsio/filesystem/googledrive"
 	"github.com/pluto-org-co/fsio/googleutils/creds"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/oauth2/jwt"
@@ -33,7 +33,7 @@ func Test_GoogleDrive(t *testing.T) {
 
 		for _, test := range tests {
 			t.Run(test.Name, func(t *testing.T) {
-				gd := filesystem.NewGoogleDrive(filesystem.GoogleDriveConfig{
+				gd := googledrive.New(googledrive.Config{
 					JWTLoader: func() (config *jwt.Config) {
 						config = creds.NewConfiguration(
 							t,

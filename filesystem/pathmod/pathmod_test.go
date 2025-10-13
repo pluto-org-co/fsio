@@ -1,29 +1,33 @@
-package filesystem_test
+package pathmod_test
 
 import (
 	"context"
 	"os"
+	"path"
 	"testing"
 	"time"
 
 	"github.com/pluto-org-co/fsio/filesystem"
+	"github.com/pluto-org-co/fsio/filesystem/directory"
+	"github.com/pluto-org-co/fsio/filesystem/pathmod"
+	"github.com/pluto-org-co/fsio/filesystem/randomfs"
 	"github.com/pluto-org-co/fsio/filesystem/testsuite"
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_Local(t *testing.T) {
+func Test_PathMod(t *testing.T) {
 	assertions := assert.New(t)
 
 	files := testsuite.GenerateFilenames(100)
 
-	randomRoot := filesystem.NewRandom(files, 32*1024*1024)
+	randomRoot := randomfs.New(files, 32*1024*1024)
 
 	tempDir, err := os.MkdirTemp("", "*")
 	if !assertions.Nil(err, "failed to create temp") {
 		return
 	}
 	defer os.RemoveAll(tempDir)
-	localRoot := filesystem.NewLocal(tempDir, 0o777, 0o777)
+	localRoot := directory.New(tempDir, 0o777, 0o777)
 
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 	defer cancel()
@@ -32,6 +36,9 @@ func Test_Local(t *testing.T) {
 		return
 	}
 
-	t.Run("Testsuite", testsuite.TestFilesystem(t, localRoot))
+	pmRoot := pathmod.New(localRoot, func(oldNew string) (newPath string) {
+		return path.Join("prepended", oldNew)
+	})
 
+	t.Run("Testsuite", testsuite.TestFilesystem(t, pmRoot))
 }

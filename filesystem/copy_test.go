@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/pluto-org-co/fsio/filesystem"
+	"github.com/pluto-org-co/fsio/filesystem/directory"
+	"github.com/pluto-org-co/fsio/filesystem/randomfs"
 	"github.com/pluto-org-co/fsio/filesystem/testsuite"
 	"github.com/stretchr/testify/assert"
 )
@@ -22,14 +24,14 @@ func Test_Copy(t *testing.T) {
 
 		files := testsuite.GenerateFilenames(100)
 
-		src := filesystem.NewRandom(files, 32*1024*1024)
+		src := randomfs.New(files, 32*1024*1024)
 
 		tempDir, err := os.MkdirTemp("", "*")
 		if !assertions.Nil(err, "failed create temporary directory") {
 			return
 		}
 		defer os.RemoveAll(tempDir)
-		dst := filesystem.NewLocal(tempDir, 0o777, 0o777)
+		dst := directory.New(tempDir, 0o777, 0o777)
 
 		ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 		defer cancel()

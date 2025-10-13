@@ -1,4 +1,4 @@
-package filesystem_test
+package s3_test
 
 import (
 	"context"
@@ -9,6 +9,8 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/pluto-org-co/fsio/filesystem"
+	"github.com/pluto-org-co/fsio/filesystem/randomfs"
+	"github.com/pluto-org-co/fsio/filesystem/s3"
 	"github.com/pluto-org-co/fsio/filesystem/testsuite"
 	"github.com/stretchr/testify/assert"
 	"github.com/testcontainers/testcontainers-go"
@@ -20,7 +22,7 @@ func Test_S3(t *testing.T) {
 
 	files := testsuite.GenerateFilenames(100)
 
-	randomRoot := filesystem.NewRandom(files, 32*1024*1024)
+	randomRoot := randomfs.New(files, 32*1024*1024)
 
 	ctxTc, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
@@ -80,7 +82,7 @@ func Test_S3(t *testing.T) {
 		return
 	}
 
-	s3Root := filesystem.NewS3(client, bucketName, time.Minute)
+	s3Root := s3.New(client, bucketName, time.Minute)
 
 	ctxCopy, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()

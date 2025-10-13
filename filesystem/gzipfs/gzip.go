@@ -1,4 +1,4 @@
-package filesystem
+package gzipfs
 
 import (
 	"bufio"
@@ -11,22 +11,24 @@ import (
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/klauspost/compress/gzip"
+	"github.com/pluto-org-co/fsio/filesystem"
+	"github.com/pluto-org-co/fsio/filesystem/utils"
 	"github.com/pluto-org-co/fsio/ioutils"
 )
 
 type Gzip struct {
 	level int
-	fs    Filesystem
+	fs    filesystem.Filesystem
 }
 
-func NewGzip(level int, fs Filesystem) (g *Gzip) {
+func New(level int, fs filesystem.Filesystem) (g *Gzip) {
 	return &Gzip{
 		level: level,
 		fs:    fs,
 	}
 }
 
-var _ Filesystem = (*Gzip)(nil)
+var _ filesystem.Filesystem = (*Gzip)(nil)
 
 func (g *Gzip) Files(ctx context.Context) (seq iter.Seq[string]) {
 	return g.fs.Files(ctx)
@@ -63,10 +65,7 @@ func (g *Gzip) Open(ctx context.Context, filePath string) (rc io.ReadCloser, err
 		}
 	}
 
-	rc = &separateReadCloser{
-		closer: file,
-		reader: reader,
-	}
+	rc = utils.NewSeparateReadCloser(file, reader)
 	return rc, nil
 }
 

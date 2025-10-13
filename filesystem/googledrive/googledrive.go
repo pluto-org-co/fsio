@@ -1,4 +1,4 @@
-package filesystem
+package googledrive
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/pluto-org-co/fsio/filesystem"
 	"github.com/pluto-org-co/fsio/googleutils/directory"
 	"github.com/pluto-org-co/fsio/googleutils/drives"
 	"github.com/pluto-org-co/fsio/googleutils/shareddrives"
@@ -26,7 +27,7 @@ type GoogleDrive struct {
 	currentAccount bool
 }
 
-func NewGoogleDrive(conf GoogleDriveConfig) (g *GoogleDrive) {
+func New(conf Config) (g *GoogleDrive) {
 	return &GoogleDrive{
 		jwtLoader:      conf.JWTLoader,
 		otherUsers:     conf.OtherUsers,
@@ -35,9 +36,9 @@ func NewGoogleDrive(conf GoogleDriveConfig) (g *GoogleDrive) {
 	}
 }
 
-var _ Filesystem = (*GoogleDrive)(nil)
+var _ filesystem.Filesystem = (*GoogleDrive)(nil)
 
-type GoogleDriveConfig struct {
+type Config struct {
 	// Constructs the config loader used for preparing the service.
 	// The mandatory permission for Service account is https://www.googleapis.com/auth/drive
 	JWTLoader func() (config *jwt.Config)

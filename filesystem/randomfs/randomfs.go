@@ -1,4 +1,4 @@
-package filesystem
+package randomfs
 
 import (
 	"bufio"
@@ -9,6 +9,7 @@ import (
 	"iter"
 	"os"
 
+	"github.com/pluto-org-co/fsio/filesystem"
 	"github.com/pluto-org-co/fsio/ioutils"
 	"github.com/pluto-org-co/fsio/random"
 )
@@ -20,7 +21,7 @@ type Random struct {
 	fileSizes int64
 }
 
-func NewRandom(locations []string, fileSizes int64) (r *Random) {
+func New(locations []string, fileSizes int64) (r *Random) {
 	r = &Random{
 		locations: make(map[string]struct{}, len(locations)),
 		fileSizes: fileSizes,
@@ -31,7 +32,7 @@ func NewRandom(locations []string, fileSizes int64) (r *Random) {
 	return r
 }
 
-var _ Filesystem = (*Random)(nil)
+var _ filesystem.Filesystem = (*Random)(nil)
 
 func (r *Random) Files(ctx context.Context) (seq iter.Seq[string]) {
 	return func(yield func(string) bool) {
