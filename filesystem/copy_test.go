@@ -22,22 +22,61 @@ func Test_Copy(t *testing.T) {
 
 		assertions := assert.New(t)
 
-		files := testsuite.GenerateFilenames(100)
-
-		src := randomfs.New(files, 32*1024*1024)
-
-		tempDir, err := os.MkdirTemp("", "*")
-		if !assertions.Nil(err, "failed create temporary directory") {
+		tempSrc, err := os.MkdirTemp("", "testing-*")
+		if !assertions.Nil(err, "failed to create temporary src directory") {
 			return
 		}
-		defer os.RemoveAll(tempDir)
-		dst := directory.New(tempDir, 0o777, 0o777)
+		defer os.RemoveAll(tempSrc)
+		var src filesystem.Filesystem = directory.New(tempSrc, 0o777, 0o777)
+		t.Run("Populate Source FS", func(t *testing.T) {
+			assertions := assert.New(t)
 
-		ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
-		defer cancel()
-		err = filesystem.CopyWorkers(100, ctx, dst, src)
-		if !assertions.Nil(err, "failed to copy files") {
-			return
-		}
+			randomSrc := randomfs.New(testsuite.GenerateFilenames(5*1024), 5*1024*1024)
+
+			ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
+			defer cancel()
+			err = filesystem.Copy(ctx, src, randomSrc)
+			if !assertions.Nil(err, "failed to copy files from random") {
+				return
+			}
+		})
+
+		t.Run("Populate Destination FS", func(t *testing.T) {
+			t.Run("Single Threaded", func(t *testing.T) {
+				assertions := assert.New(t)
+
+				tempDst, err := os.MkdirTemp("", "testing-*")
+				if !assertions.Nil(err, "failed to create temporary dst directory") {
+					return
+				}
+				defer os.RemoveAll(tempDst)
+				dst := directory.New(tempDst, 0o777, 0o777)
+
+				ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
+				defer cancel()
+				err = filesystem.Copy(ctx, dst, src)
+				if !assertions.Nil(err, "failed to copy files") {
+					return
+				}
+			})
+
+			t.Run("Multi Threaded", func(t *testing.T) {
+				assertions := assert.New(t)
+
+				tempDst, err := os.MkdirTemp("", "testing-*")
+				if !assertions.Nil(err, "failed to create temporary dst directory") {
+					return
+				}
+				defer os.RemoveAll(tempDst)
+				dst := directory.New(tempDst, 0o777, 0o777)
+
+				ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
+				defer cancel()
+				err = filesystem.CopyWorkers(20, ctx, dst, src)
+				if !assertions.Nil(err, "failed to copy files") {
+					return
+				}
+			})
+		})
 	})
 }

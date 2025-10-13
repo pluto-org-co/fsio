@@ -82,9 +82,24 @@ func Test_GoogleDrive(t *testing.T) {
 							return
 						}
 
-						checksum := hex.EncodeToString(hash.Sum(nil))
+						computedChecksum := hex.EncodeToString(hash.Sum(nil))
 
-						t.Logf("Checksum[%s]: %s", filename, checksum)
+						t.Run("ChecksumSha256", func(t *testing.T) {
+							assertions := assert.New(t)
+
+							ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
+							defer cancel()
+							remoteChecksum, err := gd.ChecksumSha256(ctx, filename)
+							if !assertions.Nil(err, "failed to calculate checksum") {
+								return
+							}
+
+							t.Logf("Computed Checksum: %s", computedChecksum)
+							t.Logf("Remote checksum: %s", remoteChecksum)
+							if !assertions.Equal(remoteChecksum, computedChecksum, "checksums doesn't match") {
+								return
+							}
+						})
 
 					})
 				}
