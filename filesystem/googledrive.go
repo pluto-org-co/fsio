@@ -2,10 +2,13 @@ package filesystem
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"iter"
 	"log"
 	"path"
+	"strings"
 
 	"github.com/pluto-org-co/fsio/googleutils/directory"
 	"github.com/pluto-org-co/fsio/googleutils/drives"
@@ -17,16 +20,18 @@ import (
 )
 
 type GoogleDrive struct {
-	jwtLoader    func() (config *jwt.Config)
-	otherUsers   bool
-	sharedDrives bool
+	jwtLoader      func() (config *jwt.Config)
+	otherUsers     bool
+	sharedDrives   bool
+	currentAccount bool
 }
 
 func NewGoogleDrive(conf GoogleDriveConfig) (g *GoogleDrive) {
 	return &GoogleDrive{
-		jwtLoader:    conf.JWTLoader,
-		otherUsers:   conf.OtherUsers,
-		sharedDrives: conf.SharedDrive,
+		jwtLoader:      conf.JWTLoader,
+		otherUsers:     conf.OtherUsers,
+		sharedDrives:   conf.SharedDrive,
+		currentAccount: conf.CurrentAccount,
 	}
 }
 
@@ -43,18 +48,59 @@ type GoogleDriveConfig struct {
 	OtherUsers bool
 	// Include shared drives with the current user.
 	SharedDrive bool
+	// Handle files of the current account
+	CurrentAccount bool
 }
 
 func (g *GoogleDrive) currentUserFilename(filename string) (finalFileme string) {
 	return path.Join("personal", "files", filename)
 }
 
+func (g *GoogleDrive) filenameIsCurrentUser(filename string) (ok bool, realFilename string) {
+	if path.IsAbs(filename) {
+		filename = filename[1:]
+	}
+
+	parts := strings.Split(filename, "/")
+
+	if len(parts) >= 2 && parts[0] == "personal" && parts[1] == "files" {
+		return true, path.Join(parts[2:]...)
+	}
+	return false, ""
+}
+
 func (g *GoogleDrive) currentSharedDriveFilename(driveName, filename string) (finalFileme string) {
 	return path.Join("drives", driveName, "files", filename)
 }
 
+func (g *GoogleDrive) filenameIsCurrentSharedDrives(filename string) (ok bool, drivename, realFilename string) {
+	if path.IsAbs(filename) {
+		filename = filename[1:]
+	}
+
+	parts := strings.Split(filename, "/")
+
+	if len(parts) >= 3 && parts[0] == "drives" && parts[2] == "files" {
+		return true, parts[1], path.Join(parts[3:]...)
+	}
+	return false, "", ""
+}
+
 func (g *GoogleDrive) userAccountDriveFilename(domain, username, filename string) (finalFilename string) {
 	return path.Join("domains", domain, "users", username, "files", filename)
+}
+
+func (g *GoogleDrive) filenameIsUserAccountDrive(filename string) (ok bool, domain, username, realFilename string) {
+	if path.IsAbs(filename) {
+		filename = filename[1:]
+	}
+
+	parts := strings.Split(filename, "/")
+
+	if len(parts) >= 5 && parts[0] == "domains" && parts[2] == "users" {
+		return true, parts[1], parts[3], path.Join(parts[4:]...)
+	}
+	return false, "", "", ""
 }
 
 func (g *GoogleDrive) Files(ctx context.Context) (seq iter.Seq[string]) {
@@ -75,9 +121,11 @@ func (g *GoogleDrive) Files(ctx context.Context) (seq iter.Seq[string]) {
 
 	return func(yield func(string) bool) {
 		// Start with the files owned by this account.
-		for filename := range drives.SeqFiles(ctx, driveSvc) {
-			if !yield(g.currentUserFilename(filename)) {
-				return
+		if g.currentAccount {
+			for filename := range drives.SeqFiles(ctx, driveSvc) {
+				if !yield(g.currentUserFilename(filename)) {
+					return
+				}
 			}
 		}
 
@@ -114,13 +162,69 @@ func (g *GoogleDrive) Files(ctx context.Context) (seq iter.Seq[string]) {
 }
 
 func (g *GoogleDrive) Open(ctx context.Context, filePath string) (rc io.ReadCloser, err error) {
-	return
+	driveSvc, err := drive.NewService(ctx, option.WithHTTPClient(g.jwtLoader().Client(ctx)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create drive service: %w", err)
+	}
+
+	if g.currentAccount {
+		ok, filename := g.filenameIsCurrentUser(filePath)
+		if ok {
+			rc, err := drives.Open(ctx, driveSvc, filename)
+			if err != nil {
+				return nil, fmt.Errorf("failed to open current user file: %w", err)
+			}
+			return rc, nil
+		}
+	}
+
+	if g.sharedDrives {
+		ok, drivename, filename := g.filenameIsCurrentSharedDrives(filePath)
+		if ok {
+			var driveId string
+			for driveEntry := range shareddrives.SeqDrives(ctx, driveSvc) {
+				if driveEntry.Name == drivename {
+					driveId = driveEntry.Id
+					break
+				}
+			}
+			if driveId == "" {
+				return nil, fmt.Errorf("failed to find drive by its name: %w", err)
+			}
+
+			rc, err := shareddrives.Open(ctx, driveSvc, driveId, filename)
+			if err != nil {
+				return nil, fmt.Errorf("failed to open drive file: %w", err)
+			}
+			return rc, nil
+		}
+	}
+
+	if g.otherUsers {
+		ok, _, username, filename := g.filenameIsUserAccountDrive(filePath)
+		if ok {
+			baseConf := g.jwtLoader()
+			baseConf.Subject = username
+
+			driveSvc, err := drive.NewService(ctx, option.WithHTTPClient(baseConf.Client(ctx)))
+			if err != nil {
+				return nil, fmt.Errorf("failed to create drive service: %w", err)
+			}
+
+			rc, err := drives.Open(ctx, driveSvc, filename)
+			if err != nil {
+				return nil, fmt.Errorf("failed to open user file: %s: %w", username, err)
+			}
+			return rc, nil
+		}
+	}
+	return nil, errors.New("file not found")
 }
 
 func (g *GoogleDrive) WriteFile(ctx context.Context, filePath string, src io.Reader) (filename string, err error) {
-	return
+	return "", errors.New("operation not supported")
 }
 
 func (g *GoogleDrive) RemoveAll(ctx context.Context, filePath string) (err error) {
-	return
+	return errors.New("operation not supported")
 }

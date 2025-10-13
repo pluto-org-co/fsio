@@ -1,7 +1,11 @@
 package filesystem_test
 
 import (
+	"bufio"
 	"context"
+	"crypto/sha512"
+	"encoding/hex"
+	"io"
 	"testing"
 	"time"
 
@@ -25,6 +29,9 @@ func Test_GoogleDrive(t *testing.T) {
 			config.Subject = creds.UserEmail()
 			return config
 		},
+		CurrentAccount: true,
+		SharedDrive:    true,
+		OtherUsers:     true,
 	})
 
 	t.Run("Succeed", func(t *testing.T) {
@@ -41,6 +48,32 @@ func Test_GoogleDrive(t *testing.T) {
 				if index >= 5 {
 					break
 				}
+
+				t.Run(filename, func(t *testing.T) {
+					t.Parallel()
+
+					assertions := assert.New(t)
+
+					ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
+					defer cancel()
+
+					rd, err := gd.Open(ctx, filename)
+					if !assertions.Nil(err, "failed to open file") {
+						return
+					}
+					defer rd.Close()
+
+					hash := sha512.New512_256()
+					_, err = io.Copy(hash, bufio.NewReader(rd))
+					if !assertions.Nil(err, "failed to hash contents") {
+						return
+					}
+
+					checksum := hex.EncodeToString(hash.Sum(nil))
+
+					t.Logf("Checksum[%s]: %s", filename, checksum)
+
+				})
 			}
 
 			assertions.NotZero(index, "no files found")
