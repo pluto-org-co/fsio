@@ -97,8 +97,8 @@ func (g *GoogleDrive) filenameIsUserAccountDrive(filename string) (ok bool, doma
 
 	parts := strings.Split(filename, "/")
 
-	if len(parts) >= 5 && parts[0] == "domains" && parts[2] == "users" {
-		return true, parts[1], parts[3], path.Join(parts[4:]...)
+	if len(parts) >= 5 && parts[0] == "domains" && parts[2] == "users" && parts[4] == "files" {
+		return true, parts[1], parts[3], path.Join(parts[5:]...)
 	}
 	return false, "", "", ""
 }
