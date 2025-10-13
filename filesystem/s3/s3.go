@@ -36,6 +36,36 @@ func New(client *minio.Client, bucket string, cacheExpiry time.Duration) (s *S3)
 
 var _ filesystem.Filesystem = (*S3)(nil)
 
+func (s *S3) Checksum(ctx context.Context, filePath string) (checksum string, err error) {
+	options := minio.StatObjectOptions{
+		Checksum: true,
+	}
+	info, err := s.client.StatObject(ctx, s.bucket, filePath, options)
+	if err != nil {
+		return "", fmt.Errorf("failed to get object information: %w", err)
+	}
+
+	checksum = info.ETag + info.ChecksumCRC32 + info.ChecksumCRC32C + info.ChecksumCRC64NVME + info.ChecksumMode + info.ChecksumSHA1 + info.ChecksumSHA256
+	if checksum != "" {
+		return checksum, nil
+	}
+
+	file, err := s.Open(ctx, filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	hash := sha512.New512_256()
+	_, err = ioutils.CopyContext(ctx, hash, bufio.NewReaderSize(file, ioutils.DefaultBufferSize), ioutils.DefaultBufferSize)
+	if err != nil {
+		return "", fmt.Errorf("failed to compute hash: %w", err)
+	}
+
+	checksum = hex.EncodeToString(hash.Sum(nil))
+	return checksum, nil
+}
+
 func (s *S3) Files(ctx context.Context) (seq iter.Seq[string]) {
 	options := minio.ListObjectsOptions{}
 
@@ -132,7 +162,7 @@ func (s *S3) WriteFile(ctx context.Context, filePath string, src io.Reader) (fil
 	var consumedBytes = bytes.NewBuffer(nil)
 	mime, err := mimetype.DetectReader(io.TeeReader(reader, consumedBytes))
 	if err != nil {
-		return
+		return "", fmt.Errorf("failed to detect mimetype: %w", err)
 	}
 
 	_, err = s.client.PutObject(
@@ -140,8 +170,12 @@ func (s *S3) WriteFile(ctx context.Context, filePath string, src io.Reader) (fil
 		s.bucket, filePath,
 		io.MultiReader(bytes.NewReader(consumedBytes.Bytes()), reader),
 		info.Size(),
-		minio.PutObjectOptions{ContentType: mime.String()},
+		minio.PutObjectOptions{
+			ContentType:  mime.String(),
+			AutoChecksum: minio.ChecksumCRC32,
+		},
 	)
+
 	if err != nil {
 		return filePath, fmt.Errorf("failed to put object: %w", err)
 	}

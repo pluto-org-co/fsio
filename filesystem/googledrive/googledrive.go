@@ -1,7 +1,10 @@
 package googledrive
 
 import (
+	"bufio"
 	"context"
+	"crypto/sha512"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +17,7 @@ import (
 	"github.com/pluto-org-co/fsio/googleutils/directory"
 	"github.com/pluto-org-co/fsio/googleutils/drives"
 	"github.com/pluto-org-co/fsio/googleutils/shareddrives"
+	"github.com/pluto-org-co/fsio/ioutils"
 	"golang.org/x/oauth2/jwt"
 	admin "google.golang.org/api/admin/directory/v1"
 	"google.golang.org/api/drive/v3"
@@ -102,6 +106,24 @@ func (g *GoogleDrive) filenameIsUserAccountDrive(filename string) (ok bool, doma
 		return true, parts[1], parts[3], path.Join(parts[5:]...)
 	}
 	return false, "", "", ""
+}
+
+func (g *GoogleDrive) Checksum(ctx context.Context, filePath string) (checksum string, err error) {
+	file, err := g.Open(ctx, filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	hash := sha512.New512_256()
+	_, err = ioutils.CopyContext(ctx, hash, bufio.NewReaderSize(file, ioutils.DefaultBufferSize), ioutils.DefaultBufferSize)
+	if err != nil {
+		return "", fmt.Errorf("failed to compute hash: %w", err)
+	}
+
+	checksum = hex.EncodeToString(hash.Sum(nil))
+
+	return checksum, nil
 }
 
 func (g *GoogleDrive) Files(ctx context.Context) (seq iter.Seq[string]) {

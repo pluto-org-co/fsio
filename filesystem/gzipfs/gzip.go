@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha512"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"iter"
@@ -29,6 +31,24 @@ func New(level int, fs filesystem.Filesystem) (g *Gzip) {
 }
 
 var _ filesystem.Filesystem = (*Gzip)(nil)
+
+func (g *Gzip) Checksum(ctx context.Context, filePath string) (checksum string, err error) {
+	file, err := g.Open(ctx, filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	hash := sha512.New512_256()
+	_, err = ioutils.CopyContext(ctx, hash, bufio.NewReaderSize(file, ioutils.DefaultBufferSize), ioutils.DefaultBufferSize)
+	if err != nil {
+		return "", fmt.Errorf("failed to compute hash: %w", err)
+	}
+
+	checksum = hex.EncodeToString(hash.Sum(nil))
+
+	return checksum, nil
+}
 
 func (g *Gzip) Files(ctx context.Context) (seq iter.Seq[string]) {
 	return g.fs.Files(ctx)

@@ -7,6 +7,8 @@ import (
 )
 
 type Filesystem interface {
+	// Returns the unique checksum of the file provided
+	Checksum(ctx context.Context, filePath string) (checksum string, err error)
 	// Returns the seq of all available files in the filesystem
 	Files(ctx context.Context) (seq iter.Seq[string])
 	// Opens a reader for the passed file.

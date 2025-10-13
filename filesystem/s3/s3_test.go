@@ -50,7 +50,8 @@ func Test_S3(t *testing.T) {
 	client, err := minio.New(
 		endpoint,
 		&minio.Options{
-			Creds: credentials.NewStaticV4(minioC.Username, minioC.Password, ""),
+			Creds:           credentials.NewStaticV4(minioC.Username, minioC.Password, ""),
+			TrailingHeaders: true,
 		},
 	)
 	if !assertions.Nil(err, "failed to create minio client") {

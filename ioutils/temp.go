@@ -5,12 +5,15 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 )
 
 type SelfdestructionFile struct {
 	*os.File
+}
+
+func (f *SelfdestructionFile) Seek(offset int64, whence int) (n int64, err error) {
+	return f.File.Seek(offset, whence)
 }
 
 func (f *SelfdestructionFile) Close() (err error) {
@@ -22,7 +25,7 @@ func (f *SelfdestructionFile) Close() (err error) {
 // Save a temporary file in order to prevent connection timeout or similar error from unknown readers.
 // This functions creates the temporary file and automatically cleans on close.
 // If reader is actually a *os.File, the function will return it without managing its deletion
-func ReaderToTempFile(ctx context.Context, src io.Reader) (file fs.File, err error) {
+func ReaderToTempFile(ctx context.Context, src io.Reader) (file File, err error) {
 	switch tr := src.(type) {
 	case *os.File:
 		return tr, nil

@@ -96,6 +96,16 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 				checksum := hex.EncodeToString(checksumHash.Sum(nil))
 				t.Logf("Checksum: %s", checksum)
 
+				computedChecksum, err := testFs.Checksum(ctx, targetFilename)
+				if !assertions.Nil(err, "failed to compute file checksum") {
+					return
+				}
+
+				if !assertions.NotEmpty(computedChecksum, "failed to request file checksum") {
+					return
+				}
+				t.Logf("FS Checksum: %s", computedChecksum)
+
 				t.Run("Check contents", func(t *testing.T) {
 					assertions := assert.New(t)
 

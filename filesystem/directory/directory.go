@@ -3,6 +3,8 @@ package directory
 import (
 	"bufio"
 	"context"
+	"crypto/sha512"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/fs"
@@ -36,6 +38,24 @@ func New(root string, dirPerm, filePerm fs.FileMode) (l *Directory) {
 }
 
 var _ filesystem.Filesystem = (*Directory)(nil)
+
+func (l *Directory) Checksum(ctx context.Context, filePath string) (checksum string, err error) {
+	file, err := l.Open(ctx, filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	hash := sha512.New512_256()
+	_, err = ioutils.CopyContext(ctx, hash, bufio.NewReaderSize(file, ioutils.DefaultBufferSize), ioutils.DefaultBufferSize)
+	if err != nil {
+		return "", fmt.Errorf("failed to compute hash: %w", err)
+	}
+
+	checksum = hex.EncodeToString(hash.Sum(nil))
+
+	return checksum, nil
+}
 
 func (l *Directory) Files(ctx context.Context) (seq iter.Seq[string]) {
 	conf := fastwalk.DefaultConfig
