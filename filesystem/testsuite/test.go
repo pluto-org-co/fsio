@@ -3,7 +3,7 @@ package testsuite
 import (
 	"bufio"
 	"context"
-	"crypto/sha512"
+	"crypto/sha256"
 	"encoding/hex"
 	"io"
 	"iter"
@@ -12,12 +12,27 @@ import (
 	"time"
 
 	"github.com/pluto-org-co/fsio/filesystem"
+	"github.com/pluto-org-co/fsio/filesystem/randomfs"
 	"github.com/pluto-org-co/fsio/ioutils"
 	"github.com/pluto-org-co/fsio/random"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.T) {
+	assertions := assert.New(t)
+
+	files := GenerateFilenames(100)
+
+	randomRoot := randomfs.New(files, 32*1024*1024)
+
+	ctxCopy, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	err := filesystem.CopyWorkers(100, ctxCopy, baseFs, randomRoot)
+	if !assertions.Nil(err, "failed to copy fs contents") {
+		return func(t *testing.T) {}
+	}
+
 	return func(t *testing.T) {
 		t.Run("Succeed", func(t *testing.T) {
 			if os.Getuid() == 0 {
@@ -78,8 +93,8 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 				const fileSize = 100 * 1024 * 1024
 				randSrc := io.LimitReader(random.InsecureReader, fileSize)
 
-				checksumHash := sha512.New512_256()
-				counter := ioutils.NewCountWriter(checksumHash)
+				referenceChecksumHash := sha256.New()
+				counter := ioutils.NewCountWriter(referenceChecksumHash)
 				randSrc = io.TeeReader(randSrc, counter)
 
 				ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
@@ -93,18 +108,22 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 
 				t.Logf("WritFile Bytes count: %d", counter.Count())
 
-				checksum := hex.EncodeToString(checksumHash.Sum(nil))
-				t.Logf("Checksum: %s", checksum)
+				referenceChecksum := hex.EncodeToString(referenceChecksumHash.Sum(nil))
+				t.Logf("Reference Checksum: %s", referenceChecksum)
 
-				computedChecksum, err := testFs.Checksum(ctx, targetFilename)
+				fsChecksum, err := testFs.Checksum(ctx, targetFilename)
 				if !assertions.Nil(err, "failed to compute file checksum") {
 					return
 				}
 
-				if !assertions.NotEmpty(computedChecksum, "failed to request file checksum") {
+				if !assertions.NotEmpty(fsChecksum, "failed to request file checksum") {
 					return
 				}
-				t.Logf("FS Checksum: %s", computedChecksum)
+				t.Logf("FS Checksum: %s", fsChecksum)
+
+				if !assertions.Equal(fsChecksum, referenceChecksum, "checksums doesn't match") {
+					return
+				}
 
 				t.Run("Check contents", func(t *testing.T) {
 					assertions := assert.New(t)
@@ -118,8 +137,8 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 					}
 					defer rc.Close()
 
-					lastChecksumHash := sha512.New512_256()
-					counter := ioutils.NewCountWriter(lastChecksumHash)
+					computedChecksum := sha256.New()
+					counter := ioutils.NewCountWriter(computedChecksum)
 					writer := bufio.NewWriter(counter)
 
 					_, err = io.Copy(writer, bufio.NewReader(rc))
@@ -132,9 +151,9 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 					}
 
 					t.Logf("Last checksum writes: %d", counter.Count())
-					lastChecksum := hex.EncodeToString(lastChecksumHash.Sum(nil))
+					readChecksum := hex.EncodeToString(computedChecksum.Sum(nil))
 
-					assertions.Equal(checksum, lastChecksum, "checksums must match")
+					assertions.Equal(referenceChecksum, readChecksum, "checksums must match")
 				})
 				t.Run("Timeout", func(t *testing.T) {
 					assertions := assert.New(t)
@@ -147,7 +166,7 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 					}
 					defer original.Close()
 
-					lastChecksumHash := sha512.New512_256()
+					lastChecksumHash := sha256.New()
 					randSrc := io.TeeReader(original, lastChecksumHash)
 
 					var targetFilename2 = GenerateFilename(5)
@@ -162,7 +181,7 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 					}
 
 					lastChecksum := hex.EncodeToString(lastChecksumHash.Sum(nil))
-					if !assertions.NotEqual(checksum, lastChecksum, "checksums should not match because the write was incomplete/timed out") {
+					if !assertions.NotEqual(referenceChecksum, lastChecksum, "checksums should not match because the write was incomplete/timed out") {
 						return
 					}
 				})

@@ -3,7 +3,7 @@ package driveutils
 import (
 	"bufio"
 	"context"
-	"crypto/sha512"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 
@@ -15,7 +15,9 @@ func Checksum(ctx context.Context, svc *drive.Service, driveFile bool, fileId st
 	getCall := svc.Files.
 		Get(fileId).
 		Context(ctx).
-		Fields("id,name,mimeType,md5Checksum,sha1Checksum,sha256Checksum")
+		SupportsAllDrives(true).
+		SupportsTeamDrives(true).
+		Fields("id,name,mimeType,sha256Checksum")
 	if driveFile {
 		getCall = getCall.SupportsAllDrives(true).SupportsTeamDrives(true)
 	}
@@ -25,9 +27,8 @@ func Checksum(ctx context.Context, svc *drive.Service, driveFile bool, fileId st
 		return "", fmt.Errorf("failed to get file by id: %w", err)
 	}
 
-	checksum = reference.Md5Checksum + reference.Sha1Checksum + reference.Sha256Checksum
-	if checksum != "" {
-		return checksum, nil
+	if reference.Sha256Checksum != "" {
+		return reference.Sha256Checksum, nil
 	}
 
 	file, err := Open(ctx, svc, reference.MimeType, reference.Id)
@@ -36,7 +37,7 @@ func Checksum(ctx context.Context, svc *drive.Service, driveFile bool, fileId st
 	}
 	defer file.Close()
 
-	hash := sha512.New512_256()
+	hash := sha256.New()
 	_, err = ioutils.CopyContext(ctx, hash, bufio.NewReaderSize(file, ioutils.DefaultBufferSize), ioutils.DefaultBufferSize)
 	if err != nil {
 		return "", fmt.Errorf("failed to calculate checksum: %w", err)

@@ -4,7 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/sha512"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -45,9 +46,10 @@ func (s *S3) Checksum(ctx context.Context, filePath string) (checksum string, er
 		return "", fmt.Errorf("failed to get object information: %w", err)
 	}
 
-	checksum = info.ETag + info.ChecksumCRC32 + info.ChecksumCRC32C + info.ChecksumCRC64NVME + info.ChecksumMode + info.ChecksumSHA1 + info.ChecksumSHA256
+	checksum = info.ChecksumSHA256
 	if checksum != "" {
-		return checksum, nil
+		rawChecksum, _ := base64.StdEncoding.DecodeString(checksum)
+		return hex.EncodeToString(rawChecksum), nil
 	}
 
 	file, err := s.Open(ctx, filePath)
@@ -56,7 +58,7 @@ func (s *S3) Checksum(ctx context.Context, filePath string) (checksum string, er
 	}
 	defer file.Close()
 
-	hash := sha512.New512_256()
+	hash := sha256.New()
 	_, err = ioutils.CopyContext(ctx, hash, bufio.NewReaderSize(file, ioutils.DefaultBufferSize), ioutils.DefaultBufferSize)
 	if err != nil {
 		return "", fmt.Errorf("failed to compute hash: %w", err)
@@ -85,7 +87,7 @@ func (s *S3) Files(ctx context.Context) (seq iter.Seq[string]) {
 }
 
 func (s *S3) Open(ctx context.Context, filePath string) (rc io.ReadCloser, err error) {
-	rawFilePathChecksum := sha512.Sum512_256([]byte(filePath))
+	rawFilePathChecksum := sha256.Sum256([]byte(filePath))
 	filePathChecksum := hex.EncodeToString(rawFilePathChecksum[:])
 
 	cachedFilePath := path.Join(os.TempDir(), filePathChecksum)
@@ -172,10 +174,9 @@ func (s *S3) WriteFile(ctx context.Context, filePath string, src io.Reader) (fil
 		info.Size(),
 		minio.PutObjectOptions{
 			ContentType:  mime.String(),
-			AutoChecksum: minio.ChecksumCRC32,
+			AutoChecksum: minio.ChecksumSHA256,
 		},
 	)
-
 	if err != nil {
 		return filePath, fmt.Errorf("failed to put object: %w", err)
 	}

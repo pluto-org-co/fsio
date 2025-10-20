@@ -24,20 +24,57 @@ func Test_Copy(t *testing.T) {
 
 		files := testsuite.GenerateFilenames(100)
 
-		src := randomfs.New(files, 32*1024*1024)
+		randomSrc := randomfs.New(files, 32*1024*1024)
 
 		tempDir, err := os.MkdirTemp("", "*")
 		if !assertions.Nil(err, "failed create temporary directory") {
 			return
 		}
 		defer os.RemoveAll(tempDir)
-		dst := directory.New(tempDir, 0o777, 0o777)
+		src := directory.New(tempDir, 0o777, 0o777)
 
 		ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 		defer cancel()
-		err = filesystem.CopyWorkers(100, ctx, dst, src)
+		err = filesystem.Copy(ctx, src, randomSrc)
 		if !assertions.Nil(err, "failed to copy files") {
 			return
 		}
+
+		t.Run("Copy", func(t *testing.T) {
+			assertions := assert.New(t)
+
+			tempDir, err := os.MkdirTemp("", "*")
+			if !assertions.Nil(err, "failed create temporary directory") {
+				return
+			}
+			defer os.RemoveAll(tempDir)
+
+			dst := directory.New(tempDir, 0o777, 0o777)
+
+			ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
+			defer cancel()
+			err = filesystem.Copy(ctx, dst, src)
+			if !assertions.Nil(err, "failed to copy files") {
+				return
+			}
+		})
+		t.Run("CopyWorkers", func(t *testing.T) {
+			assertions := assert.New(t)
+
+			tempDir, err := os.MkdirTemp("", "*")
+			if !assertions.Nil(err, "failed create temporary directory") {
+				return
+			}
+			defer os.RemoveAll(tempDir)
+
+			dst := directory.New(tempDir, 0o777, 0o777)
+
+			ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
+			defer cancel()
+			err = filesystem.CopyWorkers(100, ctx, dst, src)
+			if !assertions.Nil(err, "failed to copy files") {
+				return
+			}
+		})
 	})
 }

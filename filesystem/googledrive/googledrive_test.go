@@ -3,7 +3,7 @@ package googledrive_test
 import (
 	"bufio"
 	"context"
-	"crypto/sha512"
+	"crypto/sha256"
 	"encoding/hex"
 	"io"
 	"testing"
@@ -76,16 +76,31 @@ func Test_GoogleDrive(t *testing.T) {
 						}
 						defer rd.Close()
 
-						hash := sha512.New512_256()
+						hash := sha256.New()
 						_, err = io.Copy(hash, bufio.NewReader(rd))
 						if !assertions.Nil(err, "failed to hash contents") {
 							return
 						}
 
-						checksum := hex.EncodeToString(hash.Sum(nil))
+						computedChecksum := hex.EncodeToString(hash.Sum(nil))
 
-						t.Logf("Checksum[%s]: %s", filename, checksum)
+						t.Logf("Checksum[%s]: %s", filename, computedChecksum)
 
+						t.Run("Remote Checksum", func(t *testing.T) {
+							assertions := assert.New(t)
+
+							ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
+							defer cancel()
+
+							remoteChecksum, err := gd.Checksum(ctx, filename)
+							if !assertions.Nil(err, "failed to compute request checksum") {
+								return
+							}
+
+							if !assertions.Equal(computedChecksum, remoteChecksum, "remote checksum doesn't match local checksum") {
+								return
+							}
+						})
 					})
 				}
 

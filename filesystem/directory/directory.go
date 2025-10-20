@@ -3,7 +3,7 @@ package directory
 import (
 	"bufio"
 	"context"
-	"crypto/sha512"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -46,7 +46,7 @@ func (l *Directory) Checksum(ctx context.Context, filePath string) (checksum str
 	}
 	defer file.Close()
 
-	hash := sha512.New512_256()
+	hash := sha256.New()
 	_, err = ioutils.CopyContext(ctx, hash, bufio.NewReaderSize(file, ioutils.DefaultBufferSize), ioutils.DefaultBufferSize)
 	if err != nil {
 		return "", fmt.Errorf("failed to compute hash: %w", err)

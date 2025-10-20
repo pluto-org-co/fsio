@@ -3,7 +3,7 @@ package shareddrives_test
 import (
 	"bufio"
 	"context"
-	"crypto/sha512"
+	"crypto/sha256"
 	"encoding/hex"
 	"io"
 	"testing"
@@ -85,7 +85,7 @@ func Test_Open(t *testing.T) {
 										}
 										defer rc.Close()
 
-										hash := sha512.New512_256()
+										hash := sha256.New()
 										_, err = io.Copy(hash, bufio.NewReader(rc))
 										if !assertions.Nil(err, "failed to hash file") {
 											return

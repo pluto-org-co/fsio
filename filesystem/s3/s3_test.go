@@ -8,8 +8,6 @@ import (
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"github.com/pluto-org-co/fsio/filesystem"
-	"github.com/pluto-org-co/fsio/filesystem/randomfs"
 	"github.com/pluto-org-co/fsio/filesystem/s3"
 	"github.com/pluto-org-co/fsio/filesystem/testsuite"
 	"github.com/stretchr/testify/assert"
@@ -19,10 +17,6 @@ import (
 
 func Test_S3(t *testing.T) {
 	assertions := assert.New(t)
-
-	files := testsuite.GenerateFilenames(100)
-
-	randomRoot := randomfs.New(files, 32*1024*1024)
 
 	ctxTc, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
@@ -85,12 +79,5 @@ func Test_S3(t *testing.T) {
 
 	s3Root := s3.New(client, bucketName, time.Minute)
 
-	ctxCopy, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-
-	err = filesystem.CopyWorkers(100, ctxCopy, s3Root, randomRoot)
-	if !assertions.Nil(err, "failed to copy fs contents") {
-		return
-	}
 	t.Run("Testsuite", testsuite.TestFilesystem(t, s3Root))
 }
