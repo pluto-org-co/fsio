@@ -13,6 +13,7 @@ func Checksum(ctx context.Context, svc *drive.Service, driveId, filename string)
 		return svc.Files.
 			List().
 			SupportsAllDrives(true).
+			SupportsTeamDrives(true).
 			IncludeItemsFromAllDrives(true).
 			IncludeTeamDriveItems(true).
 			Corpora("drive").

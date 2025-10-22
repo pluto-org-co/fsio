@@ -104,7 +104,7 @@ func (g *GoogleDrive) filenameIsUserAccountDrive(filename string) (ok bool, doma
 	return false, "", "", ""
 }
 
-func (g *GoogleDrive) Checksum(ctx context.Context, filePath string) (checksum string, err error) {
+func (g *GoogleDrive) Checksum(ctx context.Context, location []string) (checksum string, err error) {
 	baseConf := g.jwtLoader()
 	baseClient := baseConf.Client(ctx)
 
@@ -169,19 +169,19 @@ func (g *GoogleDrive) Checksum(ctx context.Context, filePath string) (checksum s
 	return "", fmt.Errorf("file not found: %s", filePath)
 }
 
-func (g *GoogleDrive) Files(ctx context.Context) (seq iter.Seq[string]) {
+func (g *GoogleDrive) Files(ctx context.Context) (seq iter.Seq[[]string]) {
 	baseConf := g.jwtLoader()
 	baseClient := baseConf.Client(ctx)
 
 	driveSvc, err := drive.NewService(ctx, option.WithHTTPClient(baseClient))
 	if err != nil {
 		log.Printf("failed to get drive service: %v", err)
-		return func(yield func(string) bool) {}
+		return func(yield func([]string) bool) {}
 	}
 
 	adminSvc, _ := admin.NewService(ctx, option.WithHTTPClient(baseClient))
 
-	return func(yield func(string) bool) {
+	return func(yield func([]string) bool) {
 		// Start with the files owned by this account.
 		if g.currentAccount {
 			for filename := range drives.SeqFiles(ctx, driveSvc) {
@@ -223,7 +223,7 @@ func (g *GoogleDrive) Files(ctx context.Context) (seq iter.Seq[string]) {
 	}
 }
 
-func (g *GoogleDrive) Open(ctx context.Context, filePath string) (rc io.ReadCloser, err error) {
+func (g *GoogleDrive) Open(ctx context.Context, location []string) (rc io.ReadCloser, err error) {
 	driveSvc, err := drive.NewService(ctx, option.WithHTTPClient(g.jwtLoader().Client(ctx)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create drive service: %w", err)
@@ -283,10 +283,10 @@ func (g *GoogleDrive) Open(ctx context.Context, filePath string) (rc io.ReadClos
 	return nil, errors.New("file not found")
 }
 
-func (g *GoogleDrive) WriteFile(ctx context.Context, filePath string, src io.Reader) (filename string, err error) {
-	return "", errors.New("operation not supported")
+func (g *GoogleDrive) WriteFile(ctx context.Context, location []string, src io.Reader) (finalLocation []string, err error) {
+	return nil, errors.New("operation not supported")
 }
 
-func (g *GoogleDrive) RemoveAll(ctx context.Context, filePath string) (err error) {
+func (g *GoogleDrive) RemoveAll(ctx context.Context, location []string) (err error) {
 	return errors.New("operation not supported")
 }

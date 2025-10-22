@@ -21,7 +21,7 @@ import (
 func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.T) {
 	assertions := assert.New(t)
 
-	files := GenerateFilenames(100)
+	files := GenerateLocations(100)
 
 	randomRoot := randomfs.New(files, 32*1024*1024)
 

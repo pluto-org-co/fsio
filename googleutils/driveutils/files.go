@@ -92,7 +92,7 @@ func SeqFilesFromFilesListCall(ctx context.Context, rootId string, baseCall func
 							return
 						}
 
-						var filename string = path.Join(entry.dirEntry.asPrefix, file.Name)
+						var filename string = path.Join(entry.dirEntry.asPrefix, RemoveSlashFromPart(file.Name))
 
 						if file.MimeType == "application/vnd.google-apps.folder" {
 							pendingDirsCh <- &gdDirEntry{

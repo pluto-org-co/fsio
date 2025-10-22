@@ -1,12 +1,10 @@
 package testsuite
 
 import (
-	"strings"
-
 	"github.com/pluto-org-co/fsio/random"
 )
 
-func GenerateFilename(nParts int) (filename string) {
+func GenerateFilename(nParts int) (location []string) {
 	if nParts == 0 {
 		nParts = 1
 	}
@@ -15,11 +13,11 @@ func GenerateFilename(nParts int) (filename string) {
 	for range nParts {
 		parts = append(parts, random.InsecureString(5))
 	}
-	return strings.Join(parts, "/")
+	return parts
 }
 
-func GenerateFilenames(n int) (files []string) {
-	files = make([]string, 0, n)
+func GenerateLocations(n int) (files [][]string) {
+	files = make([][]string, 0, n)
 	for range n {
 		files = append(files, GenerateFilename(random.InsecureInt(5)))
 	}

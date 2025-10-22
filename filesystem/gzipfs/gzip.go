@@ -32,8 +32,8 @@ func New(level int, fs filesystem.Filesystem) (g *Gzip) {
 
 var _ filesystem.Filesystem = (*Gzip)(nil)
 
-func (g *Gzip) Checksum(ctx context.Context, filePath string) (checksum string, err error) {
-	file, err := g.Open(ctx, filePath)
+func (g *Gzip) Checksum(ctx context.Context, location []string) (checksum string, err error) {
+	file, err := g.Open(ctx, location)
 	if err != nil {
 		return "", fmt.Errorf("failed to open file: %w", err)
 	}
@@ -50,7 +50,7 @@ func (g *Gzip) Checksum(ctx context.Context, filePath string) (checksum string, 
 	return checksum, nil
 }
 
-func (g *Gzip) Files(ctx context.Context) (seq iter.Seq[string]) {
+func (g *Gzip) Files(ctx context.Context) (seq iter.Seq[[]string]) {
 	return g.fs.Files(ctx)
 }
 
@@ -58,8 +58,8 @@ type gzipReader struct {
 	rc io.ReadCloser
 }
 
-func (g *Gzip) Open(ctx context.Context, filePath string) (rc io.ReadCloser, err error) {
-	file, err := g.fs.Open(ctx, filePath)
+func (g *Gzip) Open(ctx context.Context, location []string) (rc io.ReadCloser, err error) {
+	file, err := g.fs.Open(ctx, location)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %w", err)
 	}
@@ -89,17 +89,17 @@ func (g *Gzip) Open(ctx context.Context, filePath string) (rc io.ReadCloser, err
 	return rc, nil
 }
 
-func (g *Gzip) WriteFile(ctx context.Context, filePath string, src io.Reader) (filename string, err error) {
+func (g *Gzip) WriteFile(ctx context.Context, location []string, src io.Reader) (finalLocation []string, err error) {
 	rawFile, err := os.CreateTemp("", "*")
 	if err != nil {
-		return filePath, fmt.Errorf("failed to create temporary raw file: %w", err)
+		return location, fmt.Errorf("failed to create temporary raw file: %w", err)
 	}
 	defer rawFile.Close()
 	defer os.Remove(rawFile.Name())
 
 	compressedFile, err := os.CreateTemp("", "*")
 	if err != nil {
-		return filePath, fmt.Errorf("failed to create temporary gzip file: %w", err)
+		return location, fmt.Errorf("failed to create temporary gzip file: %w", err)
 	}
 	defer compressedFile.Close()
 	defer os.Remove(compressedFile.Name())
@@ -107,7 +107,7 @@ func (g *Gzip) WriteFile(ctx context.Context, filePath string, src io.Reader) (f
 	// Gzip Writer
 	gzipWriter, err := gzip.NewWriterLevel(compressedFile, g.level)
 	if err != nil {
-		return filePath, fmt.Errorf("failed to prepare  gzip writer: %w", err)
+		return location, fmt.Errorf("failed to prepare  gzip writer: %w", err)
 	}
 
 	dst := bufio.NewWriterSize(io.MultiWriter(gzipWriter, rawFile), ioutils.DefaultBufferSize)
@@ -121,17 +121,17 @@ func (g *Gzip) WriteFile(ctx context.Context, filePath string, src io.Reader) (f
 
 	_, err = ioutils.CopyContext(ctx, dst, src, ioutils.DefaultBufferSize)
 	if err != nil {
-		return filePath, fmt.Errorf("failed to copy contents: %w", err)
+		return location, fmt.Errorf("failed to copy contents: %w", err)
 	}
 
 	err = dst.Flush()
 	if err != nil {
-		return filePath, fmt.Errorf("failed to flush buffered writer: %w", err)
+		return location, fmt.Errorf("failed to flush buffered writer: %w", err)
 	}
 
 	err = gzipWriter.Close()
 	if err != nil {
-		return filePath, fmt.Errorf("failed to close gzip writer: %w", err)
+		return location, fmt.Errorf("failed to close gzip writer: %w", err)
 	}
 
 	// Write to target
@@ -140,21 +140,21 @@ func (g *Gzip) WriteFile(ctx context.Context, filePath string, src io.Reader) (f
 
 	rawInfo, err := rawFile.Stat()
 	if err != nil {
-		return filePath, fmt.Errorf("failed to get raw file info: %w", err)
+		return location, fmt.Errorf("failed to get raw file info: %w", err)
 	}
 
 	compressedInfo, err := compressedFile.Stat()
 	if err != nil {
-		return filePath, fmt.Errorf("failed to get compressed file info: %w", err)
+		return location, fmt.Errorf("failed to get compressed file info: %w", err)
 	}
 
 	if compressedInfo.Size() < rawInfo.Size() {
-		return g.fs.WriteFile(ctx, filePath, compressedFile)
+		return g.fs.WriteFile(ctx, location, compressedFile)
 	}
 
-	return g.fs.WriteFile(ctx, filePath, rawFile)
+	return g.fs.WriteFile(ctx, location, rawFile)
 }
 
-func (g *Gzip) RemoveAll(ctx context.Context, filePath string) (err error) {
-	return g.fs.RemoveAll(ctx, filePath)
+func (g *Gzip) RemoveAll(ctx context.Context, location []string) (err error) {
+	return g.fs.RemoveAll(ctx, location)
 }

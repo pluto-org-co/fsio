@@ -12,6 +12,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/charlievieth/fastwalk"
 	"github.com/pluto-org-co/fsio/filesystem"
@@ -39,8 +40,8 @@ func New(root string, dirPerm, filePerm fs.FileMode) (l *Directory) {
 
 var _ filesystem.Filesystem = (*Directory)(nil)
 
-func (l *Directory) Checksum(ctx context.Context, filePath string) (checksum string, err error) {
-	file, err := l.Open(ctx, filePath)
+func (l *Directory) Checksum(ctx context.Context, location []string) (checksum string, err error) {
+	file, err := l.Open(ctx, location)
 	if err != nil {
 		return "", fmt.Errorf("failed to open file: %w", err)
 	}
@@ -57,7 +58,7 @@ func (l *Directory) Checksum(ctx context.Context, filePath string) (checksum str
 	return checksum, nil
 }
 
-func (l *Directory) Files(ctx context.Context) (seq iter.Seq[string]) {
+func (l *Directory) Files(ctx context.Context) (seq iter.Seq[[]string]) {
 	conf := fastwalk.DefaultConfig
 
 	worker := make(chan string, 1_000)
@@ -88,27 +89,26 @@ func (l *Directory) Files(ctx context.Context) (seq iter.Seq[string]) {
 			}
 		})
 	}()
-	return func(yield func(string) bool) {
+	return func(yield func([]string) bool) {
 		defer func() {
 			closeCh <- struct{}{}
 			close(closeCh)
 		}()
 		for filename := range worker {
-			if !yield(filename) {
+			if !yield(strings.Split(filename, "/")) {
 				return
 			}
 		}
 	}
 }
 
-func (l *Directory) Open(_ context.Context, filename string) (rc io.ReadCloser, err error) {
+func (l *Directory) Open(_ context.Context, location []string) (rc io.ReadCloser, err error) {
+	filename := path.Join(location...)
 	return l.chdir.Open(filename)
 }
 
-func (l *Directory) WriteFile(ctx context.Context, filePath string, src io.Reader) (filename string, err error) {
-	filePath = path.Clean(filePath)
-
-	realFilepath := path.Join(l.baseDirectory, filePath)
+func (l *Directory) WriteFile(ctx context.Context, location []string, src io.Reader) (finalLocation []string, err error) {
+	realFilepath := path.Join(l.baseDirectory, path.Clean(path.Join(location...)))
 
 	dir, _ := path.Split(realFilepath)
 
@@ -117,13 +117,13 @@ func (l *Directory) WriteFile(ctx context.Context, filePath string, src io.Reade
 	case <-ctx.Done():
 		err = ctx.Err()
 		if err != nil {
-			return filePath, fmt.Errorf("context error during directory creation: %w", err)
+			return location, fmt.Errorf("context error during directory creation: %w", err)
 		}
-		return filePath, nil
+		return location, nil
 	default:
 		err = os.MkdirAll(dir, l.dirPerm)
 		if err != nil {
-			return filePath, fmt.Errorf("failed to create file directory: %w", err)
+			return location, fmt.Errorf("failed to create file directory: %w", err)
 		}
 	}
 
@@ -133,13 +133,13 @@ func (l *Directory) WriteFile(ctx context.Context, filePath string, src io.Reade
 	case <-ctx.Done():
 		err = ctx.Err()
 		if err != nil {
-			return filePath, fmt.Errorf("context error during file creation: %w", err)
+			return location, fmt.Errorf("context error during file creation: %w", err)
 		}
-		return filePath, nil
+		return location, nil
 	default:
 		file, err = os.OpenFile(realFilepath, os.O_CREATE|os.O_WRONLY, l.filePerm)
 		if err != nil {
-			return filePath, fmt.Errorf("failed to create dst file: %w", err)
+			return location, fmt.Errorf("failed to create dst file: %w", err)
 		}
 		defer file.Close()
 
@@ -164,15 +164,15 @@ func (l *Directory) WriteFile(ctx context.Context, filePath string, src io.Reade
 
 	_, err = ioutils.CopyContext(ctx, dst, src, ioutils.DefaultBufferSize)
 	if err != nil {
-		return filePath, fmt.Errorf("failed to copy contents: %w", err)
+		return location, fmt.Errorf("failed to copy contents: %w", err)
 	}
-	return filePath, nil
+	return location, nil
 }
 
-func (l *Directory) RemoveAll(ctx context.Context, filePath string) (err error) {
-	filePath = path.Clean(filePath)
+func (l *Directory) RemoveAll(ctx context.Context, location []string) (err error) {
+	filename := path.Clean(path.Join(location...))
 
-	realFilepath := path.Join(l.baseDirectory, filePath)
+	realFilepath := path.Join(l.baseDirectory, filename)
 
 	return os.Remove(realFilepath)
 }

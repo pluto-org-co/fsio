@@ -2,7 +2,6 @@ package pathmod_test
 
 import (
 	"os"
-	"path"
 	"testing"
 
 	"github.com/pluto-org-co/fsio/filesystem/directory"
@@ -21,8 +20,11 @@ func Test_PathMod(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 	localRoot := directory.New(tempDir, 0o777, 0o777)
 
-	pmRoot := pathmod.New(localRoot, func(oldNew string) (newPath string) {
-		return path.Join("prepended", oldNew)
+	pmRoot := pathmod.New(localRoot, func(oldLocation []string) (newLocation []string) {
+		newLocation = make([]string, 0, 1+len(oldLocation))
+		newLocation = append(newLocation, "prepended")
+		newLocation = append(newLocation, oldLocation...)
+		return newLocation
 	})
 
 	t.Run("Testsuite", testsuite.TestFilesystem(t, pmRoot))

@@ -22,7 +22,7 @@ func Test_Copy(t *testing.T) {
 
 		assertions := assert.New(t)
 
-		files := testsuite.GenerateFilenames(100)
+		files := testsuite.GenerateLocations(100)
 
 		randomSrc := randomfs.New(files, 32*1024*1024)
 

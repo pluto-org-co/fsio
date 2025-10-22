@@ -12,6 +12,7 @@ import (
 	"iter"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/gabriel-vasile/mimetype"
@@ -37,11 +38,13 @@ func New(client *minio.Client, bucket string, cacheExpiry time.Duration) (s *S3)
 
 var _ filesystem.Filesystem = (*S3)(nil)
 
-func (s *S3) Checksum(ctx context.Context, filePath string) (checksum string, err error) {
+func (s *S3) Checksum(ctx context.Context, location []string) (checksum string, err error) {
+	objectKey := path.Join(location...)
+
 	options := minio.StatObjectOptions{
 		Checksum: true,
 	}
-	info, err := s.client.StatObject(ctx, s.bucket, filePath, options)
+	info, err := s.client.StatObject(ctx, s.bucket, objectKey, options)
 	if err != nil {
 		return "", fmt.Errorf("failed to get object information: %w", err)
 	}
@@ -52,7 +55,7 @@ func (s *S3) Checksum(ctx context.Context, filePath string) (checksum string, er
 		return hex.EncodeToString(rawChecksum), nil
 	}
 
-	file, err := s.Open(ctx, filePath)
+	file, err := s.Open(ctx, location)
 	if err != nil {
 		return "", fmt.Errorf("failed to open file: %w", err)
 	}
@@ -68,26 +71,28 @@ func (s *S3) Checksum(ctx context.Context, filePath string) (checksum string, er
 	return checksum, nil
 }
 
-func (s *S3) Files(ctx context.Context) (seq iter.Seq[string]) {
+func (s *S3) Files(ctx context.Context) (seq iter.Seq[[]string]) {
 	options := minio.ListObjectsOptions{}
 
 	iter := s.client.ListObjectsIter(ctx, s.bucket, options)
 
-	return func(yield func(string) bool) {
+	return func(yield func([]string) bool) {
 		for entry := range iter {
 			if entry.Err != nil {
 				return
 			}
 
-			if !yield(entry.Key) {
+			if !yield(strings.Split(entry.Key, "/")) {
 				return
 			}
 		}
 	}
 }
 
-func (s *S3) Open(ctx context.Context, filePath string) (rc io.ReadCloser, err error) {
-	rawFilePathChecksum := sha256.Sum256([]byte(filePath))
+func (s *S3) Open(ctx context.Context, location []string) (rc io.ReadCloser, err error) {
+	objectKey := path.Join(location...)
+
+	rawFilePathChecksum := sha256.Sum256([]byte(objectKey))
 	filePathChecksum := hex.EncodeToString(rawFilePathChecksum[:])
 
 	cachedFilePath := path.Join(os.TempDir(), filePathChecksum)
@@ -117,7 +122,7 @@ func (s *S3) Open(ctx context.Context, filePath string) (rc io.ReadCloser, err e
 		}
 	}()
 
-	obj, err := s.client.GetObject(ctx, s.bucket, filePath, minio.GetObjectOptions{})
+	obj, err := s.client.GetObject(ctx, s.bucket, objectKey, minio.GetObjectOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get object: %w", err)
 	}
@@ -147,16 +152,18 @@ func (s *S3) Open(ctx context.Context, filePath string) (rc io.ReadCloser, err e
 	return cachedFile, nil
 }
 
-func (s *S3) WriteFile(ctx context.Context, filePath string, src io.Reader) (filename string, err error) {
+func (s *S3) WriteFile(ctx context.Context, location []string, src io.Reader) (finalLocation []string, err error) {
+	objectKey := path.Join(location...)
+
 	srcAsFile, err := ioutils.ReaderToTempFile(ctx, src)
 	if err != nil {
-		return filePath, fmt.Errorf("failed to ensure src is a file: %w", err)
+		return nil, fmt.Errorf("failed to ensure src is a file: %w", err)
 	}
 	defer srcAsFile.Close()
 
 	info, err := srcAsFile.Stat()
 	if err != nil {
-		return filePath, fmt.Errorf("failed to get temporary file info: %w", err)
+		return nil, fmt.Errorf("failed to get temporary file info: %w", err)
 	}
 
 	reader := bufio.NewReaderSize(srcAsFile, ioutils.DefaultBufferSize)
@@ -164,12 +171,12 @@ func (s *S3) WriteFile(ctx context.Context, filePath string, src io.Reader) (fil
 	var consumedBytes = bytes.NewBuffer(nil)
 	mime, err := mimetype.DetectReader(io.TeeReader(reader, consumedBytes))
 	if err != nil {
-		return "", fmt.Errorf("failed to detect mimetype: %w", err)
+		return nil, fmt.Errorf("failed to detect mimetype: %w", err)
 	}
 
 	_, err = s.client.PutObject(
 		ctx,
-		s.bucket, filePath,
+		s.bucket, objectKey,
 		io.MultiReader(bytes.NewReader(consumedBytes.Bytes()), reader),
 		info.Size(),
 		minio.PutObjectOptions{
@@ -178,13 +185,15 @@ func (s *S3) WriteFile(ctx context.Context, filePath string, src io.Reader) (fil
 		},
 	)
 	if err != nil {
-		return filePath, fmt.Errorf("failed to put object: %w", err)
+		return nil, fmt.Errorf("failed to put object: %w", err)
 	}
 
-	return filePath, nil
+	return location, nil
 }
 
-func (s *S3) RemoveAll(ctx context.Context, filePath string) (err error) {
+func (s *S3) RemoveAll(ctx context.Context, location []string) (err error) {
+	objectKey := path.Join(location...)
+
 	options := minio.RemoveObjectOptions{}
-	return s.client.RemoveObject(ctx, s.bucket, filePath, options)
+	return s.client.RemoveObject(ctx, s.bucket, objectKey, options)
 }
