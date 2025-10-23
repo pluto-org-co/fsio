@@ -7,6 +7,7 @@ import (
 	"io"
 	"iter"
 	"log"
+	"path"
 	"slices"
 
 	"github.com/pluto-org-co/fsio/filesystem"
@@ -53,7 +54,7 @@ type Config struct {
 }
 
 func (g *GoogleDrive) currentUserFilename(location []string) (finalLocation []string) {
-	finalLocation = make([]string, 2+len(location))
+	finalLocation = make([]string, 0, 2+len(location))
 	finalLocation = append(finalLocation, "personal", "files")
 	finalLocation = append(finalLocation, location...)
 	return finalLocation
@@ -67,7 +68,7 @@ func (g *GoogleDrive) filenameIsCurrentUser(location []string) (ok bool, realLoc
 }
 
 func (g *GoogleDrive) currentSharedDriveFilename(driveName string, location []string) (finalLocation []string) {
-	finalLocation = make([]string, 3+len(location))
+	finalLocation = make([]string, 0, 3+len(location))
 	finalLocation = append(finalLocation, "drives", driveName, "files")
 	finalLocation = append(finalLocation, location...)
 	return finalLocation
@@ -81,8 +82,8 @@ func (g *GoogleDrive) filenameIsCurrentSharedDrives(location []string) (ok bool,
 }
 
 func (g *GoogleDrive) userAccountDriveFilename(domain, username string, location []string) (finalLocation []string) {
-	finalLocation = make([]string, 5+len(location))
-	finalLocation = append(finalLocation, "domain", domain, "users", username, "files")
+	finalLocation = make([]string, 0, 5+len(location))
+	finalLocation = append(finalLocation, "domains", domain, "users", username, "files")
 	finalLocation = append(finalLocation, location...)
 	return finalLocation
 }
@@ -270,7 +271,7 @@ func (g *GoogleDrive) Open(ctx context.Context, location []string) (rc io.ReadCl
 			return rc, nil
 		}
 	}
-	return nil, errors.New("file not found")
+	return nil, fmt.Errorf("file not found: %s", path.Join(location...))
 }
 
 func (g *GoogleDrive) WriteFile(ctx context.Context, location []string, src io.Reader) (finalLocation []string, err error) {

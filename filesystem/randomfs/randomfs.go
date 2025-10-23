@@ -3,8 +3,6 @@ package randomfs
 import (
 	"bufio"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -45,14 +43,10 @@ func (r *Random) Checksum(ctx context.Context, location []string) (checksum stri
 	}
 	defer file.Close()
 
-	hash := sha256.New()
-	_, err = ioutils.CopyContext(ctx, hash, bufio.NewReaderSize(file, ioutils.DefaultBufferSize), ioutils.DefaultBufferSize)
+	checksum, err = ioutils.ChecksumSha256(ctx, file)
 	if err != nil {
 		return "", fmt.Errorf("failed to compute hash: %w", err)
 	}
-
-	checksum = hex.EncodeToString(hash.Sum(nil))
-
 	return checksum, nil
 }
 

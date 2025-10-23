@@ -1,17 +1,14 @@
 package googledrive_test
 
 import (
-	"bufio"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"io"
 	"path"
 	"testing"
 	"time"
 
 	"github.com/pluto-org-co/fsio/filesystem/googledrive"
 	"github.com/pluto-org-co/fsio/googleutils/creds"
+	"github.com/pluto-org-co/fsio/ioutils"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/oauth2/jwt"
 	admin "google.golang.org/api/admin/directory/v1"
@@ -64,8 +61,6 @@ func Test_GoogleDrive(t *testing.T) {
 					}
 
 					t.Run(path.Join(location...), func(t *testing.T) {
-						t.Parallel()
-
 						assertions := assert.New(t)
 
 						ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
@@ -77,13 +72,10 @@ func Test_GoogleDrive(t *testing.T) {
 						}
 						defer rd.Close()
 
-						hash := sha256.New()
-						_, err = io.Copy(hash, bufio.NewReader(rd))
+						computedChecksum, err := ioutils.ChecksumSha256(ctx, rd)
 						if !assertions.Nil(err, "failed to hash contents") {
 							return
 						}
-
-						computedChecksum := hex.EncodeToString(hash.Sum(nil))
 
 						t.Logf("Checksum[%s]: %s", location, computedChecksum)
 						t.Run("ChecksumSha256", func(t *testing.T) {

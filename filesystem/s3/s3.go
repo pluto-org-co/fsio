@@ -61,13 +61,10 @@ func (s *S3) Checksum(ctx context.Context, location []string) (checksum string, 
 	}
 	defer file.Close()
 
-	hash := sha256.New()
-	_, err = ioutils.CopyContext(ctx, hash, bufio.NewReaderSize(file, ioutils.DefaultBufferSize), ioutils.DefaultBufferSize)
+	checksum, err = ioutils.ChecksumSha256(ctx, file)
 	if err != nil {
 		return "", fmt.Errorf("failed to compute hash: %w", err)
 	}
-
-	checksum = hex.EncodeToString(hash.Sum(nil))
 	return checksum, nil
 }
 
