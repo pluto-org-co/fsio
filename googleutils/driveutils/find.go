@@ -4,31 +4,27 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"google.golang.org/api/drive/v3"
 )
 
-func FindFileByPath(ctx context.Context, filename string, startDirectory string, baseCall func() *drive.FilesListCall) (file *drive.File, err error) {
-	parts := strings.Split(filename, "/")
-
+func FindFileByPath(ctx context.Context, location []string, startDirectory string, baseCall func() *drive.FilesListCall) (file *drive.File, err error) {
 	var currentDirectory = startDirectory
-	for index, part := range parts {
+	for index, part := range location {
 		err = baseCall().
-			PageSize(1).
-			Q(fmt.Sprintf("'%s' in parents and name='%s'", currentDirectory, AddSlashToFilename(part))).
+			Q(fmt.Sprintf("trashed=false and '%s' in parents and name='%s'", currentDirectory, part)).
+			PageSize(1_000).
 			Fields("nextPageToken,files(id,name,fullFileExtension,mimeType)").
 			Pages(ctx, func(fl *drive.FileList) (err error) {
 				if len(fl.Files) == 0 {
 					return errors.New("no files found - visited files")
 				}
 
-				if index == len(parts)-1 {
+				if index == len(location)-1 {
 					file = fl.Files[0]
 				} else {
 					currentDirectory = fl.Files[0].Id
 				}
-
 				return nil
 			})
 		if err != nil {

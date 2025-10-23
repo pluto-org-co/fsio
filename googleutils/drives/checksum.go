@@ -8,8 +8,8 @@ import (
 	"google.golang.org/api/drive/v3"
 )
 
-func Checksum(ctx context.Context, svc *drive.Service, filename string) (checksum string, err error) {
-	ref, err := driveutils.FindFileByPath(ctx, filename, "root", func() *drive.FilesListCall {
+func Checksum(ctx context.Context, svc *drive.Service, location []string) (checksum string, err error) {
+	ref, err := driveutils.FindFileByPath(ctx, location, "root", func() *drive.FilesListCall {
 		return svc.Files.List().Corpora("user")
 	})
 	if err != nil {

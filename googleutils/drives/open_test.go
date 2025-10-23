@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"io"
+	"path"
 	"testing"
 	"time"
 
@@ -61,14 +62,14 @@ func Test_Open(t *testing.T) {
 						}
 
 						var count int
-						for filename, file := range drives.SeqFiles(ctx, driveSvc) {
-							t.Logf("[%d] File: %s - %v", count, filename, file.Id)
-							t.Run(filename, func(t *testing.T) {
+						for location, file := range drives.SeqFiles(ctx, driveSvc) {
+							t.Logf("[%d] File: %s - %v", count, location, file.Id)
+							t.Run(path.Join(location...), func(t *testing.T) {
 								assertions := assert.New(t)
 
 								ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 								defer cancel()
-								rc, err := drives.Open(ctx, driveSvc, filename)
+								rc, err := drives.Open(ctx, driveSvc, location)
 								if !assertions.Nil(err, "failed to open filename") {
 									return
 								}
@@ -81,7 +82,7 @@ func Test_Open(t *testing.T) {
 								}
 
 								checksum := hex.EncodeToString(hash.Sum(nil))
-								t.Logf("Checksum[%s]: %s", filename, checksum)
+								t.Logf("Checksum[%s]: %s", location, checksum)
 							})
 							count++
 							if count >= 5 {

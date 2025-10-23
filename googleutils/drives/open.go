@@ -10,8 +10,8 @@ import (
 )
 
 // Opens a io.ReadCloser for the filename
-func Open(ctx context.Context, svc *drive.Service, filename string) (rc io.ReadCloser, err error) {
-	reference, err := driveutils.FindFileByPath(ctx, filename, "root", func() *drive.FilesListCall {
+func Open(ctx context.Context, svc *drive.Service, location []string) (rc io.ReadCloser, err error) {
+	reference, err := driveutils.FindFileByPath(ctx, location, "root", func() *drive.FilesListCall {
 		return svc.Files.List().Corpora("user")
 	})
 	if err != nil {

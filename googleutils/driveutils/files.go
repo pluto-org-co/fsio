@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 	"iter"
-	"path"
+	"slices"
 	"sync/atomic"
 	"time"
 
@@ -13,13 +13,13 @@ import (
 )
 
 type gdFileEntry struct {
-	path string
+	path []string
 	file *drive.File
 }
 
 type gdDirEntry struct {
 	id       string
-	asPrefix string
+	asPrefix []string
 }
 
 type gdFileListEntry struct {
@@ -28,7 +28,7 @@ type gdFileListEntry struct {
 }
 
 // List all the files in the passed directory using the call as reference factory
-func SeqFilesFromFilesListCall(ctx context.Context, rootId string, baseCall func() *drive.FilesListCall) (seq iter.Seq2[string, *drive.File]) {
+func SeqFilesFromFilesListCall(ctx context.Context, rootId string, baseCall func() *drive.FilesListCall) (seq iter.Seq2[[]string, *drive.File]) {
 	const MaxTimeouts = 25
 	var timeouts int
 
@@ -62,7 +62,7 @@ func SeqFilesFromFilesListCall(ctx context.Context, rootId string, baseCall func
 				go func() {
 					err := baseCall().
 						PageSize(1_000).
-						Q(fmt.Sprintf("'%s' in parents", pendingDir.id)).
+						Q(fmt.Sprintf("trashed=false and '%s' in parents", pendingDir.id)).
 						Fields("nextPageToken,files(id,name,fullFileExtension,mimeType)").
 						Pages(ctx, func(fl *drive.FileList) (err error) {
 							if done.Load() {
@@ -92,18 +92,17 @@ func SeqFilesFromFilesListCall(ctx context.Context, rootId string, baseCall func
 							return
 						}
 
-						var filename string = path.Join(entry.dirEntry.asPrefix, RemoveSlashFromPart(file.Name))
-
+						location := append(slices.Clone(entry.dirEntry.asPrefix), file.Name)
 						if file.MimeType == "application/vnd.google-apps.folder" {
 							pendingDirsCh <- &gdDirEntry{
 								id:       file.Id,
-								asPrefix: filename,
+								asPrefix: location,
 							}
 							continue
 						}
 
 						filesCh <- &gdFileEntry{
-							path: filename,
+							path: location,
 							file: file,
 						}
 					}
@@ -112,7 +111,7 @@ func SeqFilesFromFilesListCall(ctx context.Context, rootId string, baseCall func
 		}
 	}()
 
-	return func(yield func(string, *drive.File) bool) {
+	return func(yield func([]string, *drive.File) bool) {
 		defer func() {
 			doneCh <- struct{}{}
 			close(doneCh)

@@ -2,6 +2,7 @@ package shareddrives_test
 
 import (
 	"context"
+	"path"
 	"testing"
 	"time"
 
@@ -63,19 +64,19 @@ func Test_Checksum(t *testing.T) {
 								defer cancel()
 
 								var count int
-								for filename, file := range shareddrives.SeqFiles(ctx, driveSvc, driveEntry.Id) {
-									t.Logf("[%d] File: %s - %v", count, filename, file.Id)
+								for location, file := range shareddrives.SeqFiles(ctx, driveSvc, driveEntry.Id) {
+									t.Logf("[%d] File: %s - %v", count, location, file.Id)
 									count++
 									if count >= 5 {
 										break
 									}
 
-									t.Run(filename, func(t *testing.T) {
+									t.Run(path.Join(location...), func(t *testing.T) {
 										assertions := assert.New(t)
 
 										ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 										defer cancel()
-										checksum, err := shareddrives.Checksum(ctx, driveSvc, driveEntry.Id, filename)
+										checksum, err := shareddrives.Checksum(ctx, driveSvc, driveEntry.Id, location)
 										if !assertions.Nil(err, "failed to find checksum") {
 											return
 										}
@@ -85,6 +86,9 @@ func Test_Checksum(t *testing.T) {
 								}
 								totalCount += count
 							})
+							if totalCount >= 20 {
+								break
+							}
 						}
 					})
 					if totalCount >= 20 {

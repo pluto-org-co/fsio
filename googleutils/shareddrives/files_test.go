@@ -72,6 +72,9 @@ func Test_SeqFiles(t *testing.T) {
 								}
 								totalCount += count
 							})
+							if totalCount >= 20 {
+								break
+							}
 						}
 					})
 					if totalCount >= 20 {

@@ -9,7 +9,7 @@ import (
 )
 
 // List the files of the passed drive
-func SeqFiles(ctx context.Context, svc *drive.Service, driveId string) (seq iter.Seq2[string, *drive.File]) {
+func SeqFiles(ctx context.Context, svc *drive.Service, driveId string) (seq iter.Seq2[[]string, *drive.File]) {
 	return driveutils.SeqFilesFromFilesListCall(ctx, driveId, func() (call *drive.FilesListCall) {
 		return svc.Files.
 			List().

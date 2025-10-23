@@ -7,8 +7,7 @@ import (
 	"io"
 	"iter"
 	"log"
-	"path"
-	"strings"
+	"slices"
 
 	"github.com/pluto-org-co/fsio/filesystem"
 	"github.com/pluto-org-co/fsio/googleutils/directory"
@@ -53,55 +52,46 @@ type Config struct {
 	CurrentAccount bool
 }
 
-func (g *GoogleDrive) currentUserFilename(filename string) (finalFileme string) {
-	return path.Join("personal", "files", filename)
+func (g *GoogleDrive) currentUserFilename(location []string) (finalLocation []string) {
+	finalLocation = make([]string, 2+len(location))
+	finalLocation = append(finalLocation, "personal", "files")
+	finalLocation = append(finalLocation, location...)
+	return finalLocation
 }
 
-func (g *GoogleDrive) filenameIsCurrentUser(filename string) (ok bool, realFilename string) {
-	if path.IsAbs(filename) {
-		filename = filename[1:]
+func (g *GoogleDrive) filenameIsCurrentUser(location []string) (ok bool, realLocation []string) {
+	if len(location) >= 2 && location[0] == "personal" && location[1] == "files" {
+		return true, slices.Clone(location[2:])
 	}
-
-	parts := strings.Split(filename, "/")
-
-	if len(parts) >= 2 && parts[0] == "personal" && parts[1] == "files" {
-		return true, path.Join(parts[2:]...)
-	}
-	return false, ""
+	return false, nil
 }
 
-func (g *GoogleDrive) currentSharedDriveFilename(driveName, filename string) (finalFileme string) {
-	return path.Join("drives", driveName, "files", filename)
+func (g *GoogleDrive) currentSharedDriveFilename(driveName string, location []string) (finalLocation []string) {
+	finalLocation = make([]string, 3+len(location))
+	finalLocation = append(finalLocation, "drives", driveName, "files")
+	finalLocation = append(finalLocation, location...)
+	return finalLocation
 }
 
-func (g *GoogleDrive) filenameIsCurrentSharedDrives(filename string) (ok bool, drivename, realFilename string) {
-	if path.IsAbs(filename) {
-		filename = filename[1:]
+func (g *GoogleDrive) filenameIsCurrentSharedDrives(location []string) (ok bool, drivename string, realLocation []string) {
+	if len(location) >= 3 && location[0] == "drives" && location[2] == "files" {
+		return true, location[1], slices.Clone(location[3:])
 	}
-
-	parts := strings.Split(filename, "/")
-
-	if len(parts) >= 3 && parts[0] == "drives" && parts[2] == "files" {
-		return true, parts[1], path.Join(parts[3:]...)
-	}
-	return false, "", ""
+	return false, "", nil
 }
 
-func (g *GoogleDrive) userAccountDriveFilename(domain, username, filename string) (finalFilename string) {
-	return path.Join("domains", domain, "users", username, "files", filename)
+func (g *GoogleDrive) userAccountDriveFilename(domain, username string, location []string) (finalLocation []string) {
+	finalLocation = make([]string, 5+len(location))
+	finalLocation = append(finalLocation, "domain", domain, "users", username, "files")
+	finalLocation = append(finalLocation, location...)
+	return finalLocation
 }
 
-func (g *GoogleDrive) filenameIsUserAccountDrive(filename string) (ok bool, domain, username, realFilename string) {
-	if path.IsAbs(filename) {
-		filename = filename[1:]
+func (g *GoogleDrive) filenameIsUserAccountDrive(location []string) (ok bool, domain, username string, realLocation []string) {
+	if len(location) >= 5 && location[0] == "domains" && location[2] == "users" && location[4] == "files" {
+		return true, location[1], location[3], slices.Clone(location[5:])
 	}
-
-	parts := strings.Split(filename, "/")
-
-	if len(parts) >= 5 && parts[0] == "domains" && parts[2] == "users" && parts[4] == "files" {
-		return true, parts[1], parts[3], path.Join(parts[5:]...)
-	}
-	return false, "", "", ""
+	return false, "", "", nil
 }
 
 func (g *GoogleDrive) Checksum(ctx context.Context, location []string) (checksum string, err error) {
@@ -114,7 +104,7 @@ func (g *GoogleDrive) Checksum(ctx context.Context, location []string) (checksum
 	}
 
 	if g.currentAccount {
-		ok, filename := g.filenameIsCurrentUser(filePath)
+		ok, filename := g.filenameIsCurrentUser(location)
 		if ok {
 			checksum, err := drives.Checksum(ctx, driveSvc, filename)
 			if err != nil {
@@ -125,7 +115,7 @@ func (g *GoogleDrive) Checksum(ctx context.Context, location []string) (checksum
 	}
 
 	if g.sharedDrives {
-		ok, driveName, filename := g.filenameIsCurrentSharedDrives(filePath)
+		ok, driveName, filename := g.filenameIsCurrentSharedDrives(location)
 		if ok {
 			var driveId string
 			for drive := range shareddrives.SeqDrives(ctx, driveSvc) {
@@ -148,7 +138,7 @@ func (g *GoogleDrive) Checksum(ctx context.Context, location []string) (checksum
 	}
 
 	if g.otherUsers {
-		ok, _, username, filename := g.filenameIsUserAccountDrive(filePath)
+		ok, _, username, filename := g.filenameIsUserAccountDrive(location)
 		if ok {
 			userConf := g.jwtLoader()
 			userConf.Subject = username
@@ -166,7 +156,7 @@ func (g *GoogleDrive) Checksum(ctx context.Context, location []string) (checksum
 		}
 	}
 
-	return "", fmt.Errorf("file not found: %s", filePath)
+	return "", fmt.Errorf("file not found: %v", location)
 }
 
 func (g *GoogleDrive) Files(ctx context.Context) (seq iter.Seq[[]string]) {
@@ -230,7 +220,7 @@ func (g *GoogleDrive) Open(ctx context.Context, location []string) (rc io.ReadCl
 	}
 
 	if g.currentAccount {
-		ok, filename := g.filenameIsCurrentUser(filePath)
+		ok, filename := g.filenameIsCurrentUser(location)
 		if ok {
 			rc, err := drives.Open(ctx, driveSvc, filename)
 			if err != nil {
@@ -241,7 +231,7 @@ func (g *GoogleDrive) Open(ctx context.Context, location []string) (rc io.ReadCl
 	}
 
 	if g.sharedDrives {
-		ok, drivename, filename := g.filenameIsCurrentSharedDrives(filePath)
+		ok, drivename, filename := g.filenameIsCurrentSharedDrives(location)
 		if ok {
 			var driveId string
 			for driveEntry := range shareddrives.SeqDrives(ctx, driveSvc) {
@@ -263,7 +253,7 @@ func (g *GoogleDrive) Open(ctx context.Context, location []string) (rc io.ReadCl
 	}
 
 	if g.otherUsers {
-		ok, _, username, filename := g.filenameIsUserAccountDrive(filePath)
+		ok, _, username, filename := g.filenameIsUserAccountDrive(location)
 		if ok {
 			baseConf := g.jwtLoader()
 			baseConf.Subject = username
