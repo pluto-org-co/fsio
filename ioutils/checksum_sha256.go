@@ -47,11 +47,15 @@ func ChecksumSha256(ctx context.Context, src io.Reader) (checksum string, err er
 			case strings.HasPrefix(zipFile.Name, "xl/worksheets/") ||
 				strings.HasPrefix(zipFile.Name, "word/media/") ||
 				strings.HasPrefix(zipFile.Name, "ppt/slides/") ||
+				strings.HasPrefix(zipFile.Name, "Pictures/") || // ODF/OOXML embedded media (common folder name)
 				zipFile.Name == "xl/sharedStrings.xml" ||
 				zipFile.Name == "xl/workbook.xml" ||
 				zipFile.Name == "word/document.xml" ||
 				zipFile.Name == "ppt/presentation.xml" ||
-				zipFile.Name == "[Content_Types].xml":
+				zipFile.Name == "content.xml" || // ODF core document content
+				zipFile.Name == "styles.xml" || // ODF core styles (consider content)
+				zipFile.Name == "mimetype" || // ODF/OOXML package type
+				zipFile.Name == "[Content_Types].xml": // OOXML package type
 				err = func() (err error) {
 					entryReader, err := zipFile.Open()
 					if err != nil {

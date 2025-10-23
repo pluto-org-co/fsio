@@ -23,10 +23,19 @@ var OfficeMimeTypes = []string{
 	"application/vnd.ms-powerpoint", // .ppt
 }
 
+var OpenOfficeMimeTypes = []string{
+	"application/vnd.oasis.opendocument.text",         // .odt
+	"application/vnd.oasis.opendocument.spreadsheet",  // .ods
+	"application/vnd.oasis.opendocument.presentation", // .odp
+	"application/vnd.oasis.opendocument.graphics",     // .odg
+	"application/vnd.oasis.opendocument.formula",      // .odf
+}
+
 var OfficeLikeMimeTypes = func() (mimetypes []string) {
 	mimetypes = make([]string, 0, len(GoogleMimeTypes)+len(OfficeMimeTypes))
 
 	mimetypes = append(mimetypes, GoogleMimeTypes...)
 	mimetypes = append(mimetypes, OfficeMimeTypes...)
+	mimetypes = append(mimetypes, OpenOfficeMimeTypes...)
 	return mimetypes
 }()
