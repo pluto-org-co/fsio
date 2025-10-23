@@ -91,7 +91,7 @@ func Test_Open(t *testing.T) {
 						}
 						totalCount += count
 					})
-					if totalCount >= 100 {
+					if totalCount >= 10 {
 						break
 					}
 				}

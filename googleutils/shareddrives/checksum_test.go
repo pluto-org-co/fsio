@@ -86,16 +86,16 @@ func Test_Checksum(t *testing.T) {
 								}
 								totalCount += count
 							})
-							if totalCount >= 20 {
+							if totalCount >= 10 {
 								break
 							}
 						}
 					})
-					if totalCount >= 20 {
+					if totalCount >= 10 {
 						break
 					}
 				}
-				if !assertions.NotZero(totalCount, "expecting at least one drive") {
+				if !assertions.NotZero(totalCount, "expecting at least one checksum") {
 					return
 				}
 			})

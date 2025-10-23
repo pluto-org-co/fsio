@@ -61,7 +61,7 @@ func (l *Directory) Checksum(ctx context.Context, location []string) (checksum s
 func (l *Directory) Files(ctx context.Context) (seq iter.Seq[[]string]) {
 	conf := fastwalk.DefaultConfig
 
-	worker := make(chan string, 1_000)
+	worker := make(chan string, 10_000)
 	closeCh := make(chan struct{}, 1)
 	go func() {
 		defer close(worker)

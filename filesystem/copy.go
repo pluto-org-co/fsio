@@ -37,7 +37,6 @@ func CopyWorkers(workersNumber int, ctx context.Context, dst, src Filesystem) (e
 	defer close(workers)
 
 	errorsCh := make(chan error, workersNumber)
-	defer close(errorsCh)
 
 	var wg sync.WaitGroup
 	defer wg.Wait()
@@ -54,6 +53,8 @@ func CopyWorkers(workersNumber int, ctx context.Context, dst, src Filesystem) (e
 			return nil
 		case <-workers:
 			wg.Go(func() {
+				defer func() { workers <- struct{}{} }()
+
 				err = func() (err error) {
 					file, err := src.Open(ctx, filename)
 					if err != nil {

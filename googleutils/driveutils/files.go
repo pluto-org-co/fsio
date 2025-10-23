@@ -6,6 +6,7 @@ import (
 	"io"
 	"iter"
 	"slices"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -39,8 +40,11 @@ func SeqFilesFromFilesListCall(ctx context.Context, rootId string, baseCall func
 	var filesCh = make(chan *gdFileEntry, 1_000)
 	var pendingDirsCh = make(chan *gdDirEntry, 1_000)
 	pendingDirsCh <- &gdDirEntry{id: rootId}
+
 	go func() {
+		var wg sync.WaitGroup
 		defer func() {
+			wg.Wait()
 			done.Store(true)
 			close(filesCh)
 			close(pendingDirsCh)
@@ -59,7 +63,7 @@ func SeqFilesFromFilesListCall(ctx context.Context, rootId string, baseCall func
 				}
 			case pendingDir := <-pendingDirsCh:
 				timeouts = 0
-				go func() {
+				wg.Go(func() {
 					err := baseCall().
 						PageSize(1_000).
 						Q(fmt.Sprintf("trashed=false and '%s' in parents", pendingDir.id)).
@@ -78,10 +82,10 @@ func SeqFilesFromFilesListCall(ctx context.Context, rootId string, baseCall func
 					if err != nil {
 						return
 					}
-				}()
+				})
 			case entry := <-fileListCh:
 				timeouts = 0
-				go func() {
+				wg.Go(func() {
 					defer func() {
 						if err := recover(); err != nil {
 							// TODO: Log on DEV builds
@@ -106,7 +110,7 @@ func SeqFilesFromFilesListCall(ctx context.Context, rootId string, baseCall func
 							file: file,
 						}
 					}
-				}()
+				})
 			}
 		}
 	}()
