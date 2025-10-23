@@ -2,7 +2,6 @@ package s3
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -163,22 +162,47 @@ func (s *S3) WriteFile(ctx context.Context, location []string, src io.Reader) (f
 		return nil, fmt.Errorf("failed to get temporary file info: %w", err)
 	}
 
-	reader := bufio.NewReaderSize(srcAsFile, ioutils.DefaultBufferSize)
-
-	var consumedBytes = bytes.NewBuffer(nil)
-	mime, err := mimetype.DetectReader(io.TeeReader(reader, consumedBytes))
+	// Compute mimetypes
+	mime, err := mimetype.DetectReader(srcAsFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect mimetype: %w", err)
+	}
+
+	_, err = srcAsFile.Seek(0, 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to seek: %w", err)
+	}
+
+	// Calculate checksum
+	hexChecksum, err := ioutils.ChecksumSha256(ctx, srcAsFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute checksum: %w", err)
+	}
+
+	rawChecksum, err := hex.DecodeString(hexChecksum)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode hex checksum: %w", err)
+	}
+
+	b64Checksum := base64.StdEncoding.EncodeToString(rawChecksum)
+
+	_, err = srcAsFile.Seek(0, 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to seek: %w", err)
 	}
 
 	_, err = s.client.PutObject(
 		ctx,
 		s.bucket, objectKey,
-		io.MultiReader(bytes.NewReader(consumedBytes.Bytes()), reader),
+		bufio.NewReaderSize(srcAsFile, ioutils.DefaultBufferSize),
 		info.Size(),
 		minio.PutObjectOptions{
-			ContentType:  mime.String(),
-			AutoChecksum: minio.ChecksumSHA256,
+			PartSize:    uint64(info.Size()), // Upload a single part
+			Checksum:    minio.ChecksumSHA256,
+			ContentType: mime.String(),
+			UserMetadata: map[string]string{
+				"x-amz-checksum-sha256": b64Checksum,
+			},
 		},
 	)
 	if err != nil {

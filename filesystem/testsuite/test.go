@@ -1,7 +1,6 @@
 package testsuite
 
 import (
-	"bufio"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -111,21 +110,25 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 				referenceChecksum := hex.EncodeToString(referenceChecksumHash.Sum(nil))
 				t.Logf("Reference Checksum: %s", referenceChecksum)
 
-				fsChecksum, err := testFs.Checksum(ctx, targetFilename)
-				if !assertions.Nil(err, "failed to compute file checksum") {
-					return
-				}
+				t.Run("FS Checksum", func(t *testing.T) {
+					assertions := assert.New(t)
 
-				if !assertions.NotEmpty(fsChecksum, "failed to request file checksum") {
-					return
-				}
-				t.Logf("FS Checksum: %s", fsChecksum)
+					fsChecksum, err := testFs.Checksum(ctx, targetFilename)
+					if !assertions.Nil(err, "failed to compute file checksum") {
+						return
+					}
 
-				if !assertions.Equal(fsChecksum, referenceChecksum, "checksums doesn't match") {
-					return
-				}
+					if !assertions.NotEmpty(fsChecksum, "failed to request file checksum") {
+						return
+					}
+					t.Logf("FS Checksum: %s", fsChecksum)
 
-				t.Run("Check contents", func(t *testing.T) {
+					if !assertions.Equal(fsChecksum, referenceChecksum, "reference checksum doesn't match with the one provided by the FS") {
+						return
+					}
+				})
+
+				t.Run("Open checksum", func(t *testing.T) {
 					assertions := assert.New(t)
 
 					ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
@@ -137,23 +140,14 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 					}
 					defer rc.Close()
 
-					computedChecksum := sha256.New()
-					counter := ioutils.NewCountWriter(computedChecksum)
-					writer := bufio.NewWriter(counter)
-
-					_, err = io.Copy(writer, bufio.NewReader(rc))
-					if !assertions.Nil(err, "failed to write to hash") {
-						return
-					}
-					err = writer.Flush()
-					if !assertions.Nil(err, "failed to flush pending data") {
+					openChecksum, err := ioutils.ChecksumSha256(ctx, rc)
+					if !assertions.Nil(err, "failed to compute checksum") {
 						return
 					}
 
 					t.Logf("Last checksum writes: %d", counter.Count())
-					readChecksum := hex.EncodeToString(computedChecksum.Sum(nil))
 
-					assertions.Equal(referenceChecksum, readChecksum, "checksums must match")
+					assertions.Equal(referenceChecksum, openChecksum, "reference checksum must match open checksum")
 				})
 				t.Run("Timeout", func(t *testing.T) {
 					assertions := assert.New(t)
