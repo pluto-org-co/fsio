@@ -82,18 +82,55 @@ func (s *S3) ChecksumSha256(ctx context.Context, location []string) (checksum st
 	return checksum, nil
 }
 
-func (s *S3) Files(ctx context.Context) (seq iter.Seq[[]string]) {
-	options := minio.ListObjectsOptions{}
+const (
+	XAmzMetaMTime   = "X-Amz-Meta-Mtime"
+	XAmzCustomMTime = "X-Amz-Custom-Mtime"
+)
 
-	iter := s.client.ListObjectsIter(ctx, s.bucket, options)
+const TimeLayout = time.RFC822Z
 
-	return func(yield func([]string) bool) {
-		for entry := range iter {
-			if entry.Err != nil {
+func (s *S3) Files(ctx context.Context) (seq iter.Seq[*filesystem.FileEntry]) {
+	options := minio.ListObjectsOptions{
+		WithMetadata: true,
+		Recursive:    true,
+	}
+
+	objIter := s.client.ListObjectsIter(ctx, s.bucket, options)
+
+	return func(yield func(*filesystem.FileEntry) bool) {
+		for obj := range objIter {
+			if obj.Err != nil {
 				return
 			}
 
-			if !yield(strings.Split(entry.Key, "/")) {
+			lastModified := obj.LastModified
+
+			amzMeta, metaFound := obj.UserMetadata[XAmzMetaMTime]
+			if metaFound {
+				amzMetaTime, err := time.Parse(TimeLayout, amzMeta)
+				if err == nil {
+					lastModified = amzMetaTime
+				} else {
+					metaFound = false
+				}
+			}
+
+			if !metaFound {
+				amzCustom, customFound := obj.UserMetadata[XAmzCustomMTime]
+				if customFound {
+					amzCustomTime, err := time.Parse(TimeLayout, amzCustom)
+					if err == nil {
+						lastModified = amzCustomTime
+					}
+				}
+			}
+
+			entry := &filesystem.FileEntry{
+				Location: strings.Split(obj.Key, "/"),
+				ModTime:  lastModified,
+			}
+
+			if !yield(entry) {
 				return
 			}
 		}
@@ -163,7 +200,7 @@ func (s *S3) Open(ctx context.Context, location []string) (rc io.ReadCloser, err
 	return cachedFile, nil
 }
 
-func (s *S3) WriteFile(ctx context.Context, location []string, src io.Reader) (finalLocation []string, err error) {
+func (s *S3) WriteFile(ctx context.Context, location []string, src io.Reader, modTime time.Time) (finalLocation []string, err error) {
 	objectKey := path.Join(location...)
 
 	srcAsFile, err := ioutils.ReaderToTempFile(ctx, src)
@@ -217,6 +254,8 @@ func (s *S3) WriteFile(ctx context.Context, location []string, src io.Reader) (f
 			ContentType: mime.String(),
 			UserMetadata: map[string]string{
 				"x-amz-checksum-sha256": b64Checksum,
+				XAmzMetaMTime:           modTime.Format(TimeLayout),
+				XAmzCustomMTime:         modTime.Format(TimeLayout),
 			},
 		},
 	)

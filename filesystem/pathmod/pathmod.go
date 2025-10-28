@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"iter"
+	"time"
 
 	"github.com/pluto-org-co/fsio/filesystem"
 )
@@ -27,7 +28,7 @@ func (p *PathMod) ChecksumSha256(ctx context.Context, location []string) (checks
 	return p.fs.ChecksumSha256(ctx, location)
 }
 
-func (p *PathMod) Files(ctx context.Context) (seq iter.Seq[[]string]) {
+func (p *PathMod) Files(ctx context.Context) (seq iter.Seq[*filesystem.FileEntry]) {
 	return p.fs.Files(ctx)
 }
 
@@ -35,8 +36,8 @@ func (p *PathMod) Open(ctx context.Context, location []string) (rc io.ReadCloser
 	return p.fs.Open(ctx, location)
 }
 
-func (p *PathMod) WriteFile(ctx context.Context, location []string, src io.Reader) (finalLocation []string, err error) {
-	return p.fs.WriteFile(ctx, p.f(location), src)
+func (p *PathMod) WriteFile(ctx context.Context, location []string, src io.Reader, modTime time.Time) (finalLocation []string, err error) {
+	return p.fs.WriteFile(ctx, p.f(location), src, modTime)
 }
 
 func (p *PathMod) RemoveAll(ctx context.Context, location []string) (err error) {

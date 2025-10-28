@@ -55,14 +55,17 @@ func (r *Random) ChecksumSha256(ctx context.Context, location []string) (checksu
 	return checksum, nil
 }
 
-func (r *Random) Files(ctx context.Context) (seq iter.Seq[[]string]) {
-	return func(yield func([]string) bool) {
+func (r *Random) Files(ctx context.Context) (seq iter.Seq[*filesystem.FileEntry]) {
+	return func(yield func(*filesystem.FileEntry) bool) {
 		for location := range r.locations {
 			select {
 			case <-ctx.Done():
 				return
 			default:
-				if !yield(strings.Split(location, "/")) {
+				if !yield(&filesystem.FileEntry{
+					Location: strings.Split(location, "/"),
+					ModTime:  time.Date(2005, 01, 01, 01, 0, 0, 0, time.UTC),
+				}) {
 					return
 				}
 			}
@@ -80,7 +83,7 @@ func (r *Random) Open(ctx context.Context, location []string) (rc io.ReadCloser,
 	return rc, nil
 }
 
-func (r *Random) WriteFile(ctx context.Context, location []string, src io.Reader) (finalLocation []string, err error) {
+func (r *Random) WriteFile(ctx context.Context, location []string, src io.Reader, modTime time.Time) (finalLocation []string, err error) {
 	filename := path.Join(location...)
 	r.locations[filename] = struct{}{}
 

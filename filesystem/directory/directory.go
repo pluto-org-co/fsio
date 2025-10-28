@@ -11,6 +11,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/charlievieth/fastwalk"
 	"github.com/pluto-org-co/fsio/filesystem"
@@ -64,10 +65,10 @@ func (l *Directory) ChecksumSha256(ctx context.Context, location []string) (chec
 	return checksum, nil
 }
 
-func (l *Directory) Files(ctx context.Context) (seq iter.Seq[[]string]) {
+func (l *Directory) Files(ctx context.Context) (seq iter.Seq[*filesystem.FileEntry]) {
 	conf := fastwalk.DefaultConfig
 
-	worker := make(chan string, 10_000)
+	worker := make(chan *filesystem.FileEntry, 10_000)
 	closeCh := make(chan struct{}, 1)
 	go func() {
 		defer close(worker)
@@ -90,18 +91,21 @@ func (l *Directory) Files(ctx context.Context) (seq iter.Seq[[]string]) {
 
 				filename, _ := filepath.Rel(l.baseDirectory, fileLocation)
 
-				worker <- filename
+				worker <- &filesystem.FileEntry{
+					Location: strings.Split(filename, "/"),
+					ModTime:  info.ModTime(),
+				}
 				return nil
 			}
 		})
 	}()
-	return func(yield func([]string) bool) {
+	return func(yield func(*filesystem.FileEntry) bool) {
 		defer func() {
 			closeCh <- struct{}{}
 			close(closeCh)
 		}()
-		for filename := range worker {
-			if !yield(strings.Split(filename, "/")) {
+		for entry := range worker {
+			if !yield(entry) {
 				return
 			}
 		}
@@ -113,7 +117,7 @@ func (l *Directory) Open(_ context.Context, location []string) (rc io.ReadCloser
 	return l.chdir.Open(filename)
 }
 
-func (l *Directory) WriteFile(ctx context.Context, location []string, src io.Reader) (finalLocation []string, err error) {
+func (l *Directory) WriteFile(ctx context.Context, location []string, src io.Reader, modTime time.Time) (finalLocation []string, err error) {
 	realFilepath := path.Join(l.baseDirectory, path.Clean(path.Join(location...)))
 
 	dir, _ := path.Split(realFilepath)
@@ -170,7 +174,17 @@ func (l *Directory) WriteFile(ctx context.Context, location []string, src io.Rea
 
 	_, err = ioutils.CopyContext(ctx, dst, src, ioutils.DefaultBufferSize)
 	if err != nil {
-		return location, fmt.Errorf("failed to copy contents: %w", err)
+		return nil, fmt.Errorf("failed to copy contents: %w", err)
+	}
+
+	err = dst.Flush()
+	if err != nil {
+		return nil, fmt.Errorf("failed to flush changes: %w", err)
+	}
+
+	err = os.Chtimes(file.Name(), time.Now(), modTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set new mod time: %w", err)
 	}
 	return location, nil
 }

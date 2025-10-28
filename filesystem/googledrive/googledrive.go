@@ -9,6 +9,7 @@ import (
 	"log"
 	"path"
 	"slices"
+	"time"
 
 	"github.com/pluto-org-co/fsio/filesystem"
 	"github.com/pluto-org-co/fsio/googleutils/directory"
@@ -225,23 +226,28 @@ func (g *GoogleDrive) ChecksumSha256(ctx context.Context, location []string) (ch
 	return "", fmt.Errorf("file not found: %v", location)
 }
 
-func (g *GoogleDrive) Files(ctx context.Context) (seq iter.Seq[[]string]) {
+func (g *GoogleDrive) Files(ctx context.Context) (seq iter.Seq[*filesystem.FileEntry]) {
 	baseConf := g.jwtLoader()
 	baseClient := baseConf.Client(ctx)
 
 	driveSvc, err := drive.NewService(ctx, option.WithHTTPClient(baseClient))
 	if err != nil {
 		log.Printf("failed to get drive service: %v", err)
-		return func(yield func([]string) bool) {}
+		return func(yield func(*filesystem.FileEntry) bool) {}
 	}
 
 	adminSvc, _ := admin.NewService(ctx, option.WithHTTPClient(baseClient))
 
-	return func(yield func([]string) bool) {
+	return func(yield func(*filesystem.FileEntry) bool) {
 		// Start with the files owned by this account.
 		if g.currentAccount {
-			for filename := range drives.SeqFiles(ctx, driveSvc) {
-				if !yield(g.currentUserFilename(filename)) {
+			for location, file := range drives.SeqFiles(ctx, driveSvc) {
+				modTime, _ := time.Parse(time.RFC3339, file.ModifiedTime)
+				entry := &filesystem.FileEntry{
+					Location: g.currentUserFilename(location),
+					ModTime:  modTime,
+				}
+				if !yield(entry) {
 					return
 				}
 			}
@@ -249,8 +255,13 @@ func (g *GoogleDrive) Files(ctx context.Context) (seq iter.Seq[[]string]) {
 
 		if g.sharedDrives {
 			for drive := range shareddrives.SeqDrives(ctx, driveSvc) {
-				for filename := range shareddrives.SeqFiles(ctx, driveSvc, drive.Id) {
-					if !yield(g.currentSharedDriveFilename(drive.Name, filename)) {
+				for location, file := range shareddrives.SeqFiles(ctx, driveSvc, drive.Id) {
+					modTime, _ := time.Parse(time.RFC3339, file.ModifiedTime)
+					entry := &filesystem.FileEntry{
+						Location: g.currentSharedDriveFilename(drive.Name, location),
+						ModTime:  modTime,
+					}
+					if !yield(entry) {
 						return
 					}
 				}
@@ -268,8 +279,13 @@ func (g *GoogleDrive) Files(ctx context.Context) (seq iter.Seq[[]string]) {
 						log.Printf("failed to load user configuration: %v", err)
 						return
 					}
-					for filename := range drives.SeqFiles(ctx, userSvc) {
-						if !yield(g.userAccountDriveFilename(domain.DomainName, user.PrimaryEmail, filename)) {
+					for location, file := range drives.SeqFiles(ctx, userSvc) {
+						modTime, _ := time.Parse(time.RFC3339, file.ModifiedTime)
+						entry := &filesystem.FileEntry{
+							Location: g.userAccountDriveFilename(domain.DomainName, user.PrimaryEmail, location),
+							ModTime:  modTime,
+						}
+						if !yield(entry) {
 							return
 						}
 					}
@@ -339,7 +355,7 @@ func (g *GoogleDrive) Open(ctx context.Context, location []string) (rc io.ReadCl
 	return nil, fmt.Errorf("file not found: %s", path.Join(location...))
 }
 
-func (g *GoogleDrive) WriteFile(ctx context.Context, location []string, src io.Reader) (finalLocation []string, err error) {
+func (g *GoogleDrive) WriteFile(ctx context.Context, location []string, src io.Reader, modTime time.Time) (finalLocation []string, err error) {
 	return nil, errors.New("operation not supported")
 }
 

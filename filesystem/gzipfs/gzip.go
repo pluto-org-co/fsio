@@ -8,6 +8,7 @@ import (
 	"io"
 	"iter"
 	"os"
+	"time"
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/klauspost/compress/gzip"
@@ -48,7 +49,7 @@ func (g *Gzip) ChecksumSha256(ctx context.Context, location []string) (checksum 
 	return checksum, nil
 }
 
-func (g *Gzip) Files(ctx context.Context) (seq iter.Seq[[]string]) {
+func (g *Gzip) Files(ctx context.Context) (seq iter.Seq[*filesystem.FileEntry]) {
 	return g.fs.Files(ctx)
 }
 
@@ -87,7 +88,7 @@ func (g *Gzip) Open(ctx context.Context, location []string) (rc io.ReadCloser, e
 	return rc, nil
 }
 
-func (g *Gzip) WriteFile(ctx context.Context, location []string, src io.Reader) (finalLocation []string, err error) {
+func (g *Gzip) WriteFile(ctx context.Context, location []string, src io.Reader, modTime time.Time) (finalLocation []string, err error) {
 	rawFile, err := os.CreateTemp("", "*")
 	if err != nil {
 		return location, fmt.Errorf("failed to create temporary raw file: %w", err)
@@ -147,10 +148,10 @@ func (g *Gzip) WriteFile(ctx context.Context, location []string, src io.Reader) 
 	}
 
 	if compressedInfo.Size() < rawInfo.Size() {
-		return g.fs.WriteFile(ctx, location, compressedFile)
+		return g.fs.WriteFile(ctx, location, compressedFile, modTime)
 	}
 
-	return g.fs.WriteFile(ctx, location, rawFile)
+	return g.fs.WriteFile(ctx, location, rawFile, modTime)
 }
 
 func (g *Gzip) RemoveAll(ctx context.Context, location []string) (err error) {

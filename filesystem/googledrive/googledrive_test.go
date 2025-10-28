@@ -53,20 +53,20 @@ func Test_GoogleDrive(t *testing.T) {
 				defer cancel()
 
 				var index int
-				for location := range gd.Files(ctx) {
-					t.Logf("[%d] Filename: %s", index, location)
+				for entry := range gd.Files(ctx) {
+					t.Logf("[%d] Filename: %s", index, entry)
 					index++
 					if index >= 5 {
 						break
 					}
 
-					t.Run(path.Join(location...), func(t *testing.T) {
+					t.Run(path.Join(entry.Location...), func(t *testing.T) {
 						assertions := assert.New(t)
 
 						ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 						defer cancel()
 
-						rd, err := gd.Open(ctx, location)
+						rd, err := gd.Open(ctx, entry.Location)
 						if !assertions.Nil(err, "failed to open file") {
 							return
 						}
@@ -77,13 +77,13 @@ func Test_GoogleDrive(t *testing.T) {
 							return
 						}
 
-						t.Logf("Checksum[%s]: %s", location, computedChecksum)
+						t.Logf("Checksum[%s]: %s", entry, computedChecksum)
 						t.Run("ChecksumSha256", func(t *testing.T) {
 							assertions := assert.New(t)
 
 							ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 							defer cancel()
-							remoteChecksum, err := gd.ChecksumSha256(ctx, location)
+							remoteChecksum, err := gd.ChecksumSha256(ctx, entry.Location)
 							if !assertions.Nil(err, "failed to calculate checksum") {
 								return
 							}
@@ -101,7 +101,7 @@ func Test_GoogleDrive(t *testing.T) {
 							ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 							defer cancel()
 
-							remoteChecksum, err := gd.ChecksumSha256(ctx, location)
+							remoteChecksum, err := gd.ChecksumSha256(ctx, entry.Location)
 							if !assertions.Nil(err, "failed to compute request checksum") {
 								return
 							}
