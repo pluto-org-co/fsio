@@ -7,15 +7,25 @@ import (
 )
 
 func Copy(ctx context.Context, dst, src Filesystem) (err error) {
-	for filename := range src.Files(ctx) {
+	for location := range src.Files(ctx) {
 		err = func() (err error) {
-			file, err := src.Open(ctx, filename)
+			srcChecksum, err := src.Checksum(ctx, location)
+			if err != nil {
+				return fmt.Errorf("failed to get src checksum: %w", err)
+			}
+
+			dstChecksum, _ := dst.Checksum(ctx, location)
+			if srcChecksum != "" && srcChecksum == dstChecksum {
+				return nil
+			}
+
+			file, err := src.Open(ctx, location)
 			if err != nil {
 				return fmt.Errorf("failed to open src file: %w", err)
 			}
 			defer file.Close()
 
-			_, err = dst.WriteFile(ctx, filename, file)
+			_, err = dst.WriteFile(ctx, location, file)
 			if err != nil {
 				return fmt.Errorf("failed to write dst file: %w", err)
 			}
@@ -23,7 +33,7 @@ func Copy(ctx context.Context, dst, src Filesystem) (err error) {
 			return nil
 		}()
 		if err != nil {
-			return fmt.Errorf("failed to copy: %s: %w", filename, err)
+			return fmt.Errorf("failed to copy: %s: %w", location, err)
 		}
 	}
 	return nil
@@ -41,7 +51,7 @@ func CopyWorkers(workersNumber int, ctx context.Context, dst, src Filesystem) (e
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
-	for filename := range src.Files(ctx) {
+	for location := range src.Files(ctx) {
 		select {
 		case err = <-errorsCh:
 			return fmt.Errorf("errors during copy: %w", err)
@@ -56,13 +66,23 @@ func CopyWorkers(workersNumber int, ctx context.Context, dst, src Filesystem) (e
 				defer func() { workers <- struct{}{} }()
 
 				err = func() (err error) {
-					file, err := src.Open(ctx, filename)
+					srcChecksum, err := src.Checksum(ctx, location)
+					if err != nil {
+						return fmt.Errorf("failed to get src checksum: %w", err)
+					}
+
+					dstChecksum, _ := dst.Checksum(ctx, location)
+					if srcChecksum != "" && srcChecksum == dstChecksum {
+						return nil
+					}
+
+					file, err := src.Open(ctx, location)
 					if err != nil {
 						return fmt.Errorf("failed to open src file: %w", err)
 					}
 					defer file.Close()
 
-					_, err = dst.WriteFile(ctx, filename, file)
+					_, err = dst.WriteFile(ctx, location, file)
 					if err != nil {
 						return fmt.Errorf("failed to write dst file: %w", err)
 					}
@@ -70,7 +90,7 @@ func CopyWorkers(workersNumber int, ctx context.Context, dst, src Filesystem) (e
 					return nil
 				}()
 				if err != nil {
-					errorsCh <- fmt.Errorf("failed to copy: %s: %w", filename, err)
+					errorsCh <- fmt.Errorf("failed to copy: %s: %w", location, err)
 				}
 			})
 		}
