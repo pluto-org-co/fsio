@@ -7,7 +7,9 @@ import (
 )
 
 type Filesystem interface {
-	// Returns the unique checksum of the file provided
+	// Returns the unique time checksum of the file provided
+	ChecksumTime(ctx context.Context, location []string) (checksum string, err error)
+	// Returns the unique sha256 checksum of the file provided
 	ChecksumSha256(ctx context.Context, location []string) (checksum string, err error)
 	// Returns the seq of all available files in the filesystem
 	Files(ctx context.Context) (seq iter.Seq[[]string])

@@ -38,6 +38,18 @@ func New(root string, dirPerm, filePerm fs.FileMode) (l *Directory) {
 
 var _ filesystem.Filesystem = (*Directory)(nil)
 
+func (l *Directory) ChecksumTime(ctx context.Context, location []string) (checksum string, err error) {
+	filename := path.Join(l.baseDirectory, path.Clean(path.Join(location...)))
+
+	info, err := os.Stat(filename)
+	if err != nil {
+		return "", fmt.Errorf("failed to get file info: %w", err)
+	}
+
+	checksum = ioutils.ChecksumTime(info.ModTime(), info.Size())
+	return checksum, nil
+}
+
 func (l *Directory) ChecksumSha256(ctx context.Context, location []string) (checksum string, err error) {
 	file, err := l.Open(ctx, location)
 	if err != nil {

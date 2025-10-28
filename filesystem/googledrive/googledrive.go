@@ -95,6 +95,71 @@ func (g *GoogleDrive) filenameIsUserAccountDrive(location []string) (ok bool, do
 	return false, "", "", nil
 }
 
+func (g *GoogleDrive) ChecksumTime(ctx context.Context, location []string) (checksum string, err error) {
+	baseConf := g.jwtLoader()
+	baseClient := baseConf.Client(ctx)
+
+	driveSvc, err := drive.NewService(ctx, option.WithHTTPClient(baseClient))
+	if err != nil {
+		return "", fmt.Errorf("failed to prepare drive service: %w", err)
+	}
+
+	if g.currentAccount {
+		ok, filename := g.filenameIsCurrentUser(location)
+		if ok {
+			checksum, err := drives.ChecksumTime(ctx, driveSvc, filename)
+			if err != nil {
+				return "", fmt.Errorf("failed to compute current user checksum: %w", err)
+			}
+			return checksum, nil
+		}
+	}
+
+	if g.sharedDrives {
+		ok, driveName, filename := g.filenameIsCurrentSharedDrives(location)
+		if ok {
+			var driveId string
+			for drive := range shareddrives.SeqDrives(ctx, driveSvc) {
+				if drive.Name == driveName {
+					driveId = drive.Id
+					break
+				}
+			}
+
+			if driveId == "" {
+				return "", fmt.Errorf("drive not found by name: %s", driveName)
+			}
+
+			checksum, err := shareddrives.ChecksumTime(ctx, driveSvc, driveId, filename)
+			if err != nil {
+				return "", fmt.Errorf("failed to compute shared drive checksum: %w", err)
+			}
+			return checksum, nil
+		}
+	}
+
+	if g.otherUsers {
+		ok, _, username, filename := g.filenameIsUserAccountDrive(location)
+		if ok {
+			userConf := g.jwtLoader()
+			userConf.Subject = username
+
+			userSvc, err := drive.NewService(ctx, option.WithHTTPClient(userConf.Client(ctx)))
+			if err != nil {
+				return "", fmt.Errorf("failed to prepare client for user: %w", err)
+			}
+
+			checksum, err := drives.ChecksumTime(ctx, userSvc, filename)
+			if err != nil {
+				return "", fmt.Errorf("failed to compute checksum for user file: %w", err)
+			}
+			return checksum, nil
+		}
+	}
+
+	return "", fmt.Errorf("file not found: %v", location)
+}
+
 func (g *GoogleDrive) ChecksumSha256(ctx context.Context, location []string) (checksum string, err error) {
 	baseConf := g.jwtLoader()
 	baseClient := baseConf.Client(ctx)

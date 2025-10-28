@@ -19,6 +19,10 @@ type PathMod struct {
 
 var _ filesystem.Filesystem = (*PathMod)(nil)
 
+func (p *PathMod) ChecksumTime(ctx context.Context, location []string) (checksum string, err error) {
+	return p.fs.ChecksumTime(ctx, location)
+}
+
 func (p *PathMod) ChecksumSha256(ctx context.Context, location []string) (checksum string, err error) {
 	return p.fs.ChecksumSha256(ctx, location)
 }

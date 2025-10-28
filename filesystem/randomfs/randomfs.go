@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/pluto-org-co/fsio/filesystem"
 	"github.com/pluto-org-co/fsio/ioutils"
@@ -35,6 +36,10 @@ func New(locations [][]string, fileSizes int64) (r *Random) {
 }
 
 var _ filesystem.Filesystem = (*Random)(nil)
+
+func (r *Random) ChecksumTime(ctx context.Context, location []string) (checksum string, err error) {
+	return ioutils.ChecksumTime(time.Now(), int64(random.InsecureReader.Uint64())), nil
+}
 
 func (r *Random) ChecksumSha256(ctx context.Context, location []string) (checksum string, err error) {
 	file, err := r.Open(ctx, location)
