@@ -83,7 +83,7 @@ func Test_GoogleDrive(t *testing.T) {
 
 							ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 							defer cancel()
-							remoteChecksum, err := gd.Checksum(ctx, location)
+							remoteChecksum, err := gd.ChecksumSha256(ctx, location)
 							if !assertions.Nil(err, "failed to calculate checksum") {
 								return
 							}
@@ -101,7 +101,7 @@ func Test_GoogleDrive(t *testing.T) {
 							ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 							defer cancel()
 
-							remoteChecksum, err := gd.Checksum(ctx, location)
+							remoteChecksum, err := gd.ChecksumSha256(ctx, location)
 							if !assertions.Nil(err, "failed to compute request checksum") {
 								return
 							}

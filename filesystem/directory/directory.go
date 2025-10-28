@@ -38,7 +38,7 @@ func New(root string, dirPerm, filePerm fs.FileMode) (l *Directory) {
 
 var _ filesystem.Filesystem = (*Directory)(nil)
 
-func (l *Directory) Checksum(ctx context.Context, location []string) (checksum string, err error) {
+func (l *Directory) ChecksumSha256(ctx context.Context, location []string) (checksum string, err error) {
 	file, err := l.Open(ctx, location)
 	if err != nil {
 		return "", fmt.Errorf("failed to open file: %w", err)

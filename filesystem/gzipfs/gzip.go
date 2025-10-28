@@ -30,7 +30,7 @@ func New(level int, fs filesystem.Filesystem) (g *Gzip) {
 
 var _ filesystem.Filesystem = (*Gzip)(nil)
 
-func (g *Gzip) Checksum(ctx context.Context, location []string) (checksum string, err error) {
+func (g *Gzip) ChecksumSha256(ctx context.Context, location []string) (checksum string, err error) {
 	file, err := g.Open(ctx, location)
 	if err != nil {
 		return "", fmt.Errorf("failed to open file: %w", err)

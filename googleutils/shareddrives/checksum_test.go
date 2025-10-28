@@ -76,7 +76,7 @@ func Test_Checksum(t *testing.T) {
 
 										ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 										defer cancel()
-										checksum, err := shareddrives.Checksum(ctx, driveSvc, driveEntry.Id, location)
+										checksum, err := shareddrives.ChecksumTime(ctx, driveSvc, driveEntry.Id, location)
 										if !assertions.Nil(err, "failed to find checksum") {
 											return
 										}

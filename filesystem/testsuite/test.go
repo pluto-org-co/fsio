@@ -113,7 +113,7 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 				t.Run("FS Checksum", func(t *testing.T) {
 					assertions := assert.New(t)
 
-					fsChecksum, err := testFs.Checksum(ctx, targetFilename)
+					fsChecksum, err := testFs.ChecksumSha256(ctx, targetFilename)
 					if !assertions.Nil(err, "failed to compute file checksum") {
 						return
 					}

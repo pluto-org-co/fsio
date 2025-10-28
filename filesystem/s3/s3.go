@@ -37,7 +37,7 @@ func New(client *minio.Client, bucket string, cacheExpiry time.Duration) (s *S3)
 
 var _ filesystem.Filesystem = (*S3)(nil)
 
-func (s *S3) Checksum(ctx context.Context, location []string) (checksum string, err error) {
+func (s *S3) ChecksumSha256(ctx context.Context, location []string) (checksum string, err error) {
 	objectKey := path.Join(location...)
 
 	options := minio.StatObjectOptions{

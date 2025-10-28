@@ -65,7 +65,7 @@ func Test_Checksum(t *testing.T) {
 
 								ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 								defer cancel()
-								checksum, err := drives.Checksum(ctx, driveSvc, location)
+								checksum, err := drives.ChecksumTime(ctx, driveSvc, location)
 								if !assertions.Nil(err, "failed to open filename") {
 									return
 								}

@@ -8,7 +8,7 @@ import (
 	"google.golang.org/api/drive/v3"
 )
 
-func Checksum(ctx context.Context, svc *drive.Service, location []string) (checksum string, err error) {
+func ChecksumTime(ctx context.Context, svc *drive.Service, location []string) (checksum string, err error) {
 	ref, err := driveutils.FindFileByPath(ctx, location, "root", func() *drive.FilesListCall {
 		return svc.Files.List().Corpora("user")
 	})
@@ -16,7 +16,22 @@ func Checksum(ctx context.Context, svc *drive.Service, location []string) (check
 		return "", fmt.Errorf("failed to find file: %w", err)
 	}
 
-	checksum, err = driveutils.Checksum(ctx, svc, false, ref.Id)
+	checksum, err = driveutils.ChecksumTime(ctx, svc, false, ref.Id)
+	if err != nil {
+		return "", fmt.Errorf("failed to compute checksum: %w", err)
+	}
+	return checksum, nil
+}
+
+func ChecksumSha256(ctx context.Context, svc *drive.Service, location []string) (checksum string, err error) {
+	ref, err := driveutils.FindFileByPath(ctx, location, "root", func() *drive.FilesListCall {
+		return svc.Files.List().Corpora("user")
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to find file: %w", err)
+	}
+
+	checksum, err = driveutils.ChecksumSha256(ctx, svc, false, ref.Id)
 	if err != nil {
 		return "", fmt.Errorf("failed to compute checksum: %w", err)
 	}

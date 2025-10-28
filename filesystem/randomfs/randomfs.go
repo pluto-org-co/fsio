@@ -36,7 +36,7 @@ func New(locations [][]string, fileSizes int64) (r *Random) {
 
 var _ filesystem.Filesystem = (*Random)(nil)
 
-func (r *Random) Checksum(ctx context.Context, location []string) (checksum string, err error) {
+func (r *Random) ChecksumSha256(ctx context.Context, location []string) (checksum string, err error) {
 	file, err := r.Open(ctx, location)
 	if err != nil {
 		return "", fmt.Errorf("failed to open file: %w", err)

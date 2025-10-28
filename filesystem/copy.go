@@ -9,12 +9,12 @@ import (
 func Copy(ctx context.Context, dst, src Filesystem) (err error) {
 	for location := range src.Files(ctx) {
 		err = func() (err error) {
-			srcChecksum, err := src.Checksum(ctx, location)
+			srcChecksum, err := src.ChecksumSha256(ctx, location)
 			if err != nil {
 				return fmt.Errorf("failed to get src checksum: %w", err)
 			}
 
-			dstChecksum, _ := dst.Checksum(ctx, location)
+			dstChecksum, _ := dst.ChecksumSha256(ctx, location)
 			if srcChecksum != "" && srcChecksum == dstChecksum {
 				return nil
 			}
@@ -66,12 +66,12 @@ func CopyWorkers(workersNumber int, ctx context.Context, dst, src Filesystem) (e
 				defer func() { workers <- struct{}{} }()
 
 				err = func() (err error) {
-					srcChecksum, err := src.Checksum(ctx, location)
+					srcChecksum, err := src.ChecksumSha256(ctx, location)
 					if err != nil {
 						return fmt.Errorf("failed to get src checksum: %w", err)
 					}
 
-					dstChecksum, _ := dst.Checksum(ctx, location)
+					dstChecksum, _ := dst.ChecksumSha256(ctx, location)
 					if srcChecksum != "" && srcChecksum == dstChecksum {
 						return nil
 					}

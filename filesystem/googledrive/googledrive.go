@@ -95,7 +95,7 @@ func (g *GoogleDrive) filenameIsUserAccountDrive(location []string) (ok bool, do
 	return false, "", "", nil
 }
 
-func (g *GoogleDrive) Checksum(ctx context.Context, location []string) (checksum string, err error) {
+func (g *GoogleDrive) ChecksumSha256(ctx context.Context, location []string) (checksum string, err error) {
 	baseConf := g.jwtLoader()
 	baseClient := baseConf.Client(ctx)
 
@@ -107,7 +107,7 @@ func (g *GoogleDrive) Checksum(ctx context.Context, location []string) (checksum
 	if g.currentAccount {
 		ok, filename := g.filenameIsCurrentUser(location)
 		if ok {
-			checksum, err := drives.Checksum(ctx, driveSvc, filename)
+			checksum, err := drives.ChecksumSha256(ctx, driveSvc, filename)
 			if err != nil {
 				return "", fmt.Errorf("failed to compute current user checksum: %w", err)
 			}
@@ -130,7 +130,7 @@ func (g *GoogleDrive) Checksum(ctx context.Context, location []string) (checksum
 				return "", fmt.Errorf("drive not found by name: %s", driveName)
 			}
 
-			checksum, err := shareddrives.Checksum(ctx, driveSvc, driveId, filename)
+			checksum, err := shareddrives.ChecksumSha256(ctx, driveSvc, driveId, filename)
 			if err != nil {
 				return "", fmt.Errorf("failed to compute shared drive checksum: %w", err)
 			}
@@ -149,7 +149,7 @@ func (g *GoogleDrive) Checksum(ctx context.Context, location []string) (checksum
 				return "", fmt.Errorf("failed to prepare client for user: %w", err)
 			}
 
-			checksum, err := drives.Checksum(ctx, userSvc, filename)
+			checksum, err := drives.ChecksumSha256(ctx, userSvc, filename)
 			if err != nil {
 				return "", fmt.Errorf("failed to compute checksum for user file: %w", err)
 			}
