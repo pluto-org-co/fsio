@@ -99,7 +99,9 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 				ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 				defer cancel()
 
-				targetFilename, err := testFs.WriteFile(ctx, GenerateFilename(5), randSrc, time.Now())
+				modTime := time.Now()
+
+				targetFilename, err := testFs.WriteFile(ctx, GenerateFilename(5), randSrc, modTime)
 				if !assertions.Nil(err, "failed to write random data to temporary file") {
 					return
 				}
@@ -111,21 +113,40 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 				t.Logf("Reference Checksum: %s", referenceChecksum)
 
 				t.Run("FS Checksum", func(t *testing.T) {
-					assertions := assert.New(t)
+					t.Run("Sha256", func(t *testing.T) {
+						assertions := assert.New(t)
 
-					fsChecksum, err := testFs.ChecksumSha256(ctx, targetFilename)
-					if !assertions.Nil(err, "failed to compute file checksum") {
-						return
-					}
+						fsChecksum, err := testFs.ChecksumSha256(ctx, targetFilename)
+						if !assertions.Nil(err, "failed to compute file checksum") {
+							return
+						}
 
-					if !assertions.NotEmpty(fsChecksum, "failed to request file checksum") {
-						return
-					}
-					t.Logf("FS Checksum: %s", fsChecksum)
+						if !assertions.NotEmpty(fsChecksum, "failed to request file checksum") {
+							return
+						}
+						t.Logf("FS Checksum: %s", fsChecksum)
 
-					if !assertions.Equal(fsChecksum, referenceChecksum, "reference checksum doesn't match with the one provided by the FS") {
-						return
-					}
+						if !assertions.Equal(fsChecksum, referenceChecksum, "reference checksum doesn't match with the one provided by the FS") {
+							return
+						}
+					})
+					t.Run("Time", func(t *testing.T) {
+						assertions := assert.New(t)
+
+						fsChecksum, err := testFs.ChecksumTime(ctx, targetFilename)
+						if !assertions.Nil(err, "failed to compute file checksum") {
+							return
+						}
+
+						if !assertions.NotEmpty(fsChecksum, "failed to request file checksum") {
+							return
+						}
+						t.Logf("FS Checksum: %s", fsChecksum)
+
+						if !assertions.Equal(fsChecksum, ioutils.ChecksumTime(modTime, counter.Count()), "reference checksum doesn't match with the one provided by the FS") {
+							return
+						}
+					})
 				})
 
 				t.Run("Open checksum", func(t *testing.T) {

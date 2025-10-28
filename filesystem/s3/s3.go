@@ -43,12 +43,12 @@ func (s *S3) ChecksumTime(ctx context.Context, location []string) (checksum stri
 	options := minio.StatObjectOptions{
 		Checksum: true,
 	}
-	info, err := s.client.StatObject(ctx, s.bucket, objectKey, options)
+	objInfo, err := s.client.StatObject(ctx, s.bucket, objectKey, options)
 	if err != nil {
 		return "", fmt.Errorf("failed to get object information: %w", err)
 	}
 
-	checksum = ioutils.ChecksumTime(info.LastModified, info.Size)
+	checksum = ioutils.ChecksumTime(LastModifiedFromObj(&objInfo), objInfo.Size)
 	return checksum, nil
 }
 
@@ -87,7 +87,31 @@ const (
 	XAmzCustomMTime = "X-Amz-Custom-Mtime"
 )
 
-const TimeLayout = time.RFC822Z
+func LastModifiedFromObj(obj *minio.ObjectInfo) (lastModified time.Time) {
+	lastModified = obj.LastModified
+
+	amzMeta, metaFound := obj.UserMetadata[XAmzMetaMTime]
+	if metaFound {
+		amzMetaTime, err := time.Parse(ioutils.DefaultTimeLayout, amzMeta)
+		if err == nil {
+			lastModified = amzMetaTime
+		} else {
+			metaFound = false
+		}
+	}
+
+	if !metaFound {
+		amzCustom, customFound := obj.UserMetadata[XAmzCustomMTime]
+		if customFound {
+			amzCustomTime, err := time.Parse(ioutils.DefaultTimeLayout, amzCustom)
+			if err == nil {
+				lastModified = amzCustomTime
+			}
+		}
+	}
+
+	return lastModified
+}
 
 func (s *S3) Files(ctx context.Context) (seq iter.Seq[*filesystem.FileEntry]) {
 	options := minio.ListObjectsOptions{
@@ -95,38 +119,18 @@ func (s *S3) Files(ctx context.Context) (seq iter.Seq[*filesystem.FileEntry]) {
 		Recursive:    true,
 	}
 
-	objIter := s.client.ListObjectsIter(ctx, s.bucket, options)
+	objInfoIter := s.client.ListObjectsIter(ctx, s.bucket, options)
 
 	return func(yield func(*filesystem.FileEntry) bool) {
-		for obj := range objIter {
-			if obj.Err != nil {
+		for objInfo := range objInfoIter {
+			if objInfo.Err != nil {
 				return
 			}
 
-			lastModified := obj.LastModified
-
-			amzMeta, metaFound := obj.UserMetadata[XAmzMetaMTime]
-			if metaFound {
-				amzMetaTime, err := time.Parse(TimeLayout, amzMeta)
-				if err == nil {
-					lastModified = amzMetaTime
-				} else {
-					metaFound = false
-				}
-			}
-
-			if !metaFound {
-				amzCustom, customFound := obj.UserMetadata[XAmzCustomMTime]
-				if customFound {
-					amzCustomTime, err := time.Parse(TimeLayout, amzCustom)
-					if err == nil {
-						lastModified = amzCustomTime
-					}
-				}
-			}
+			lastModified := LastModifiedFromObj(&objInfo)
 
 			entry := &filesystem.FileEntry{
-				Location: strings.Split(obj.Key, "/"),
+				Location: strings.Split(objInfo.Key, "/"),
 				ModTime:  lastModified,
 			}
 
@@ -243,6 +247,8 @@ func (s *S3) WriteFile(ctx context.Context, location []string, src io.Reader, mo
 		return nil, fmt.Errorf("failed to seek: %w", err)
 	}
 
+	sTime := modTime.Format(ioutils.DefaultTimeLayout)
+
 	_, err = s.client.PutObject(
 		ctx,
 		s.bucket, objectKey,
@@ -254,8 +260,8 @@ func (s *S3) WriteFile(ctx context.Context, location []string, src io.Reader, mo
 			ContentType: mime.String(),
 			UserMetadata: map[string]string{
 				"x-amz-checksum-sha256": b64Checksum,
-				XAmzMetaMTime:           modTime.Format(TimeLayout),
-				XAmzCustomMTime:         modTime.Format(TimeLayout),
+				XAmzMetaMTime:           sTime,
+				XAmzCustomMTime:         sTime,
 			},
 		},
 	)
