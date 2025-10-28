@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 )
 
 func Copy(ctx context.Context, dst, src Filesystem) (err error) {
+	now := time.Now()
+
 	for entry := range src.Files(ctx) {
 		err = func() (err error) {
 			srcChecksum, err := src.ChecksumTime(ctx, entry.Location)
@@ -25,7 +28,7 @@ func Copy(ctx context.Context, dst, src Filesystem) (err error) {
 			}
 			defer file.Close()
 
-			_, err = dst.WriteFile(ctx, entry.Location, file, entry.ModTime)
+			_, err = dst.WriteFile(ctx, entry.Location, file, now)
 			if err != nil {
 				return fmt.Errorf("failed to write dst file: %w", err)
 			}
@@ -40,6 +43,8 @@ func Copy(ctx context.Context, dst, src Filesystem) (err error) {
 }
 
 func CopyWorkers(workersNumber int, ctx context.Context, dst, src Filesystem) (err error) {
+	now := time.Now()
+
 	var workers = make(chan struct{}, workersNumber)
 	for range workersNumber {
 		workers <- struct{}{}
@@ -82,7 +87,7 @@ func CopyWorkers(workersNumber int, ctx context.Context, dst, src Filesystem) (e
 					}
 					defer srcFile.Close()
 
-					_, err = dst.WriteFile(ctx, entry.Location, srcFile, entry.ModTime)
+					_, err = dst.WriteFile(ctx, entry.Location, srcFile, now)
 					if err != nil {
 						return fmt.Errorf("failed to write dst file: %w", err)
 					}
