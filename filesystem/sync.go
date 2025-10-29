@@ -2,6 +2,7 @@ package filesystem
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"sync"
@@ -29,6 +30,7 @@ func Sync(ctx context.Context, dst, src Filesystem) (err error) {
 
 				dstChecksum, _ := dst.ChecksumTime(ctx, entry.Location)
 				if srcChecksum != "" && srcChecksum == dstChecksum {
+					log.Print("[*] Skipping:", entry.Location)
 					return nil
 				}
 
@@ -46,7 +48,11 @@ func Sync(ctx context.Context, dst, src Filesystem) (err error) {
 				return nil
 			}()
 			if err != nil {
-				log.Printf("failed to sync: %s: %v", entry, err)
+				err = fmt.Errorf("failed to sync: %s: %w", entry, err)
+				log.Println(err)
+				if errors.Is(err, context.DeadlineExceeded) {
+					return err
+				}
 			}
 		}
 
@@ -71,7 +77,10 @@ func SyncWorkers(workersNumber int, ctx context.Context, dst, src Filesystem) (e
 	for entry := range src.Files(ctx) {
 		select {
 		case err := <-errorsCh:
-			log.Printf("errors during sync: %v", err)
+			log.Println(err)
+			if errors.Is(err, context.DeadlineExceeded) {
+				return err
+			}
 		case <-ctx.Done():
 			err = ctx.Err()
 			if err != nil {
@@ -90,6 +99,7 @@ func SyncWorkers(workersNumber int, ctx context.Context, dst, src Filesystem) (e
 
 					dstChecksum, _ := dst.ChecksumTime(ctx, entry.Location)
 					if srcChecksum != "" && srcChecksum == dstChecksum {
+						log.Print("[*] Skipping:", entry.Location)
 						return nil
 					}
 

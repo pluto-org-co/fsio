@@ -17,6 +17,7 @@ import (
 )
 
 func Test_SyncDrive(t *testing.T) {
+	const DriveTimeout = 10 * time.Second
 	t.Run("Succeed", func(t *testing.T) {
 		if os.Getuid() == 0 {
 			t.Skip("Can't run this test as root")
@@ -50,7 +51,7 @@ func Test_SyncDrive(t *testing.T) {
 
 			dst := directory.New(dstTmpDir, 0o777, 0o777)
 
-			ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+			ctx, cancel := context.WithTimeout(context.TODO(), DriveTimeout)
 			defer cancel()
 
 			now := time.Now()
@@ -59,7 +60,7 @@ func Test_SyncDrive(t *testing.T) {
 			t.Run("Second Time", func(t *testing.T) {
 				assertions := assert.New(t)
 
-				ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+				ctx, cancel := context.WithTimeout(context.TODO(), DriveTimeout)
 				defer cancel()
 
 				now := time.Now()
@@ -82,7 +83,7 @@ func Test_SyncDrive(t *testing.T) {
 
 			dst := directory.New(dstTmpDir, 0o777, 0o777)
 
-			ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+			ctx, cancel := context.WithTimeout(context.TODO(), DriveTimeout)
 			defer cancel()
 
 			now := time.Now()
@@ -92,7 +93,7 @@ func Test_SyncDrive(t *testing.T) {
 			t.Run("Second Time", func(t *testing.T) {
 				assertions := assert.New(t)
 
-				ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+				ctx, cancel := context.WithTimeout(context.TODO(), DriveTimeout)
 				defer cancel()
 
 				now := time.Now()

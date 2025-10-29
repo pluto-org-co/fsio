@@ -11,6 +11,13 @@ var GoogleMimeTypes = []string{
 	"application/vnd.google-apps.form",
 }
 
+var DocsLikeMimeTypes = []string{
+	"application/vnd.google-apps.document",
+	"application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+	"application/msword",                      // .doc
+	"application/vnd.oasis.opendocument.text", // .odt
+}
+
 var OfficeMimeTypes = []string{
 	// Microsoft Office Formats (OOXML)
 	"application/vnd.openxmlformats-officedocument.wordprocessingml.document",   // .docx
