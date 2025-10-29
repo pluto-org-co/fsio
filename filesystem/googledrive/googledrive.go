@@ -7,6 +7,7 @@ import (
 	"io"
 	"iter"
 	"log"
+	"net/http"
 	"path"
 	"slices"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/pluto-org-co/fsio/googleutils/directory"
 	"github.com/pluto-org-co/fsio/googleutils/drives"
 	"github.com/pluto-org-co/fsio/googleutils/shareddrives"
+	"github.com/pluto-org-co/fsio/ioutils"
 	"golang.org/x/oauth2/jwt"
 	admin "google.golang.org/api/admin/directory/v1"
 	"google.golang.org/api/drive/v3"
@@ -96,9 +98,20 @@ func (g *GoogleDrive) filenameIsUserAccountDrive(location []string) (ok bool, do
 	return false, "", "", nil
 }
 
+const (
+	MaxAttempts = 10
+	MinSleep    = time.Minute
+)
+
+func (g *GoogleDrive) ClientFromConf(ctx context.Context, conf *jwt.Config) (client *http.Client) {
+	client = conf.Client(ctx)
+	client.Transport = ioutils.NewRetryTransport(client.Transport, MaxAttempts, MinSleep)
+	return client
+}
+
 func (g *GoogleDrive) ChecksumTime(ctx context.Context, location []string) (checksum string, err error) {
 	baseConf := g.jwtLoader()
-	baseClient := baseConf.Client(ctx)
+	baseClient := g.ClientFromConf(ctx, baseConf)
 
 	driveSvc, err := drive.NewService(ctx, option.WithHTTPClient(baseClient))
 	if err != nil {
@@ -145,7 +158,7 @@ func (g *GoogleDrive) ChecksumTime(ctx context.Context, location []string) (chec
 			userConf := g.jwtLoader()
 			userConf.Subject = username
 
-			userSvc, err := drive.NewService(ctx, option.WithHTTPClient(userConf.Client(ctx)))
+			userSvc, err := drive.NewService(ctx, option.WithHTTPClient(g.ClientFromConf(ctx, userConf)))
 			if err != nil {
 				return "", fmt.Errorf("failed to prepare client for user: %w", err)
 			}
@@ -163,7 +176,7 @@ func (g *GoogleDrive) ChecksumTime(ctx context.Context, location []string) (chec
 
 func (g *GoogleDrive) ChecksumSha256(ctx context.Context, location []string) (checksum string, err error) {
 	baseConf := g.jwtLoader()
-	baseClient := baseConf.Client(ctx)
+	baseClient := g.ClientFromConf(ctx, baseConf)
 
 	driveSvc, err := drive.NewService(ctx, option.WithHTTPClient(baseClient))
 	if err != nil {
@@ -210,7 +223,7 @@ func (g *GoogleDrive) ChecksumSha256(ctx context.Context, location []string) (ch
 			userConf := g.jwtLoader()
 			userConf.Subject = username
 
-			userSvc, err := drive.NewService(ctx, option.WithHTTPClient(userConf.Client(ctx)))
+			userSvc, err := drive.NewService(ctx, option.WithHTTPClient(g.ClientFromConf(ctx, userConf)))
 			if err != nil {
 				return "", fmt.Errorf("failed to prepare client for user: %w", err)
 			}
@@ -228,7 +241,7 @@ func (g *GoogleDrive) ChecksumSha256(ctx context.Context, location []string) (ch
 
 func (g *GoogleDrive) Files(ctx context.Context) (seq iter.Seq[*filesystem.FileEntry]) {
 	baseConf := g.jwtLoader()
-	baseClient := baseConf.Client(ctx)
+	baseClient := g.ClientFromConf(ctx, baseConf)
 
 	driveSvc, err := drive.NewService(ctx, option.WithHTTPClient(baseClient))
 	if err != nil {
@@ -274,7 +287,7 @@ func (g *GoogleDrive) Files(ctx context.Context) (seq iter.Seq[*filesystem.FileE
 					userConf := g.jwtLoader()
 					userConf.Subject = user.PrimaryEmail
 
-					userSvc, err := drive.NewService(ctx, option.WithHTTPClient(userConf.Client(ctx)))
+					userSvc, err := drive.NewService(ctx, option.WithHTTPClient(g.ClientFromConf(ctx, userConf)))
 					if err != nil {
 						log.Printf("failed to load user configuration: %v", err)
 						return
@@ -296,7 +309,7 @@ func (g *GoogleDrive) Files(ctx context.Context) (seq iter.Seq[*filesystem.FileE
 }
 
 func (g *GoogleDrive) Open(ctx context.Context, location []string) (rc io.ReadCloser, err error) {
-	driveSvc, err := drive.NewService(ctx, option.WithHTTPClient(g.jwtLoader().Client(ctx)))
+	driveSvc, err := drive.NewService(ctx, option.WithHTTPClient(g.ClientFromConf(ctx, g.jwtLoader())))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create drive service: %w", err)
 	}
@@ -340,7 +353,7 @@ func (g *GoogleDrive) Open(ctx context.Context, location []string) (rc io.ReadCl
 			baseConf := g.jwtLoader()
 			baseConf.Subject = username
 
-			driveSvc, err := drive.NewService(ctx, option.WithHTTPClient(baseConf.Client(ctx)))
+			driveSvc, err := drive.NewService(ctx, option.WithHTTPClient(g.ClientFromConf(ctx, baseConf)))
 			if err != nil {
 				return nil, fmt.Errorf("failed to create drive service: %w", err)
 			}
