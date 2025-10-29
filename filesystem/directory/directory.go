@@ -32,7 +32,7 @@ func New(root string, dirPerm, filePerm fs.FileMode) (l *Directory) {
 	return &Directory{
 		filePerm:      filePerm,
 		dirPerm:       dirPerm,
-		baseDirectory: root,
+		baseDirectory: path.Clean(root),
 		chdir:         os.DirFS(root),
 	}
 }
@@ -118,16 +118,18 @@ func (l *Directory) Open(_ context.Context, location []string) (rc io.ReadCloser
 }
 
 func (l *Directory) WriteFile(ctx context.Context, location []string, src io.Reader, modTime time.Time) (finalLocation []string, err error) {
-	realFilepath := path.Join(l.baseDirectory, path.Clean(path.Join(location...)))
+	filename := path.Join(l.baseDirectory, path.Clean(path.Join(location...)))
+	filename = path.Clean(filename)
 
-	dir, _ := path.Split(realFilepath)
+	basedir, _ := path.Split(filename)
+	basedir = path.Clean(basedir)
 
-	if realFilepath != "/" && dir != l.baseDirectory {
-		os.RemoveAll(realFilepath)
+	if filename != "" && filename != "/" {
+		os.RemoveAll(filename)
 	}
 
-	if dir != "/" && dir != l.baseDirectory {
-		os.RemoveAll(dir)
+	if basedir != "" && basedir != "/" && basedir != l.baseDirectory {
+		os.RemoveAll(basedir)
 	}
 
 	// Create directory location
@@ -139,7 +141,7 @@ func (l *Directory) WriteFile(ctx context.Context, location []string, src io.Rea
 		}
 		return location, nil
 	default:
-		err = os.MkdirAll(dir, l.dirPerm)
+		err = os.MkdirAll(basedir, l.dirPerm)
 		if err != nil {
 			return location, fmt.Errorf("failed to create file directory: %w", err)
 		}
@@ -155,7 +157,7 @@ func (l *Directory) WriteFile(ctx context.Context, location []string, src io.Rea
 		}
 		return location, nil
 	default:
-		file, err = os.OpenFile(realFilepath, os.O_CREATE|os.O_WRONLY, l.filePerm)
+		file, err = os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, l.filePerm)
 		if err != nil {
 			return location, fmt.Errorf("failed to create dst file: %w", err)
 		}
@@ -198,9 +200,7 @@ func (l *Directory) WriteFile(ctx context.Context, location []string, src io.Rea
 }
 
 func (l *Directory) RemoveAll(ctx context.Context, location []string) (err error) {
-	filename := path.Clean(path.Join(location...))
+	filename := path.Join(l.baseDirectory, path.Clean(path.Join(location...)))
 
-	realFilepath := path.Join(l.baseDirectory, filename)
-
-	return os.Remove(realFilepath)
+	return os.Remove(filename)
 }
