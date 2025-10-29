@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"path"
 	"sync"
 	"time"
 )
@@ -29,8 +30,11 @@ func Sync(ctx context.Context, dst, src Filesystem) (err error) {
 				}
 
 				dstChecksum, _ := dst.ChecksumTime(ctx, entry.Location)
+
+				// log.Println("Location =", path.Join(entry.Location...), "SrcChecksum =", srcChecksum, "DstChecksum =", dstChecksum)
+
 				if srcChecksum != "" && srcChecksum == dstChecksum {
-					log.Print("[*] Skipping:", entry.Location)
+					log.Println("[*] Skipping:", entry.Location)
 					return nil
 				}
 
@@ -98,8 +102,10 @@ func SyncWorkers(workersNumber int, ctx context.Context, dst, src Filesystem) (e
 					}
 
 					dstChecksum, _ := dst.ChecksumTime(ctx, entry.Location)
+
+					log.Println("[*] Processing:", path.Join(entry.Location...))
 					if srcChecksum != "" && srcChecksum == dstChecksum {
-						log.Print("[*] Skipping:", entry.Location)
+						log.Println("[*] Skipping:", entry.Location)
 						return nil
 					}
 

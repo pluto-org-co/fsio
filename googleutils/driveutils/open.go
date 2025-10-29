@@ -83,6 +83,19 @@ func Open(ctx context.Context, svc *drive.Service, mimeType, fileId string) (rd 
 			}
 			defer res.Body.Close()
 		}
+	} else if mimeType == "application/vnd.google-apps.shortcut" {
+		fileInfo, err := svc.Files.
+			Get(fileId).
+			Fields("shortcutDetails").
+			Context(ctx).
+			Do()
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrieve file information for shortcuts: %w", err)
+		}
+		if fileInfo.ShortcutDetails != nil && fileInfo.ShortcutDetails.TargetId != "" && fileInfo.ShortcutDetails.TargetMimeType != "application/vnd.google-apps.folder" {
+			return Open(ctx, svc, fileInfo.ShortcutDetails.TargetMimeType, fileInfo.ShortcutDetails.TargetId)
+		}
+		return nil, errors.New("invalid shortcut")
 	} else {
 		res, err = svc.Files.
 			Get(fileId).

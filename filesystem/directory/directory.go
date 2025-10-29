@@ -124,14 +124,6 @@ func (l *Directory) WriteFile(ctx context.Context, location []string, src io.Rea
 	basedir, _ := path.Split(filename)
 	basedir = path.Clean(basedir)
 
-	if filename != "" && filename != "/" {
-		os.RemoveAll(filename)
-	}
-
-	if basedir != "" && basedir != "/" && basedir != l.baseDirectory {
-		os.RemoveAll(basedir)
-	}
-
 	// Create directory location
 	select {
 	case <-ctx.Done():
