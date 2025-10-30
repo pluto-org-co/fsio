@@ -51,8 +51,6 @@ func Test_SyncDrive(t *testing.T) {
 		})
 
 		t.Run("Sync", func(t *testing.T) {
-			t.Skip()
-			return
 			assertions := assert.New(t)
 
 			ctxTc, cancel := context.WithTimeout(context.Background(), time.Minute)
