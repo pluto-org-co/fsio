@@ -2,8 +2,9 @@ package shareddrives
 
 import (
 	"context"
-	"io"
 	"iter"
+	"slices"
+	"strings"
 
 	"google.golang.org/api/drive/v3"
 )
@@ -11,36 +12,28 @@ import (
 // List the drives that the account can access:
 // Requires at least: https://www.googleapis.com/auth/drive
 func SeqDrives(ctx context.Context, svc *drive.Service) (seq iter.Seq[*drive.Drive]) {
-	var doneCh = make(chan struct{}, 1)
-	var drivesCh = make(chan *drive.DriveList, 1_000)
+	const MaxPageSize = 1_000
 
-	go func() {
-		defer close(drivesCh)
-
+	return func(yield func(*drive.Drive) bool) {
+		var drives = make([]*drive.Drive, 0, MaxPageSize)
 		err := svc.Drives.
 			List().
 			Context(ctx).
+			PageSize(MaxPageSize).
 			Pages(ctx, func(dl *drive.DriveList) (err error) {
-				select {
-				case <-doneCh:
-					return io.EOF
-				case drivesCh <- dl:
-					return nil
-				}
+				drives = append(drives, dl.Drives...)
+				return nil
 			})
 		if err != nil {
 			// TODO: What should this do with the error?
+			return
 		}
-	}()
-	return func(yield func(*drive.Drive) bool) {
-		defer close(doneCh)
 
-		for driveList := range drivesCh {
-			for _, drive := range driveList.Drives {
-				if !yield(drive) {
-					doneCh <- struct{}{}
-					return
-				}
+		slices.SortFunc(drives, func(a, b *drive.Drive) int { return strings.Compare(a.Name, b.Name) })
+
+		for _, drive := range drives {
+			if !yield(drive) {
+				return
 			}
 		}
 	}

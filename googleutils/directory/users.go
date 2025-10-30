@@ -21,6 +21,7 @@ func SeqUsers(ctx context.Context, svc *admin.Service, domain string) (seq iter.
 			List().
 			Context(ctx).
 			Domain(domain).
+			OrderBy("primaryEmail").
 			Pages(ctx, func(u *admin.Users) (err error) {
 				select {
 				case usersCh <- u:

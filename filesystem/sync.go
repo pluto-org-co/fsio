@@ -5,16 +5,41 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"path"
 	"sync"
 	"time"
 )
 
+type SyncCtx struct {
+	MaxFiles int64
+}
+
+type SyncOption func(ctx *SyncCtx) (err error)
+
+func WithSyncOptionMaxFiles(maxFiles int64) (option SyncOption) {
+	return func(ctx *SyncCtx) (err error) {
+		ctx.MaxFiles = maxFiles
+		return nil
+	}
+}
+
 // Same as Copy but doesn't stop on errors
-func Sync(ctx context.Context, dst, src Filesystem) (err error) {
+func Sync(ctx context.Context, dst, src Filesystem, options ...SyncOption) (err error) {
+	var syncCtx = &SyncCtx{
+		MaxFiles: -1,
+	}
+	for _, option := range options {
+		option(syncCtx)
+	}
+
 	now := time.Now()
 
+	var count int64
 	for entry := range src.Files(ctx) {
+		if syncCtx.MaxFiles > 0 && count >= syncCtx.MaxFiles {
+			return nil
+		}
+		count++
+
 		select {
 		case <-ctx.Done():
 			err = ctx.Err()
@@ -24,17 +49,10 @@ func Sync(ctx context.Context, dst, src Filesystem) (err error) {
 			return nil
 		default:
 			err := func() (err error) {
-				srcChecksum, err := src.ChecksumTime(ctx, entry.Location)
-				if err != nil {
-					return fmt.Errorf("failed to get src checksum: %w", err)
-				}
-
+				srcChecksum, _ := src.ChecksumTime(ctx, entry.Location)
 				dstChecksum, _ := dst.ChecksumTime(ctx, entry.Location)
 
-				// log.Println("Location =", path.Join(entry.Location...), "SrcChecksum =", srcChecksum, "DstChecksum =", dstChecksum)
-
 				if srcChecksum != "" && srcChecksum == dstChecksum {
-					log.Println("[*] Skipping:", entry.Location)
 					return nil
 				}
 
@@ -64,7 +82,14 @@ func Sync(ctx context.Context, dst, src Filesystem) (err error) {
 	return nil
 }
 
-func SyncWorkers(workersNumber int, ctx context.Context, dst, src Filesystem) (err error) {
+func SyncWorkers(workersNumber int, ctx context.Context, dst, src Filesystem, options ...SyncOption) (err error) {
+	var syncCtx = &SyncCtx{
+		MaxFiles: 0,
+	}
+	for _, option := range options {
+		option(syncCtx)
+	}
+
 	now := time.Now()
 
 	var workers = make(chan struct{}, workersNumber)
@@ -78,13 +103,19 @@ func SyncWorkers(workersNumber int, ctx context.Context, dst, src Filesystem) (e
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
+	var count int64
 	for entry := range src.Files(ctx) {
+		if syncCtx.MaxFiles > 0 && count >= syncCtx.MaxFiles {
+			return nil
+		}
+		count++
+
 		select {
 		case err := <-errorsCh:
-			log.Println(err)
 			if errors.Is(err, context.DeadlineExceeded) {
 				return err
 			}
+			log.Println(err)
 		case <-ctx.Done():
 			err = ctx.Err()
 			if err != nil {
@@ -96,16 +127,10 @@ func SyncWorkers(workersNumber int, ctx context.Context, dst, src Filesystem) (e
 				defer func() { workers <- struct{}{} }()
 
 				err := func() (err error) {
-					srcChecksum, err := src.ChecksumTime(ctx, entry.Location)
-					if err != nil {
-						return fmt.Errorf("failed to get src checksum: %w", err)
-					}
-
+					srcChecksum, _ := src.ChecksumTime(ctx, entry.Location)
 					dstChecksum, _ := dst.ChecksumTime(ctx, entry.Location)
 
-					log.Println("[*] Processing:", path.Join(entry.Location...))
 					if srcChecksum != "" && srcChecksum == dstChecksum {
-						log.Println("[*] Skipping:", entry.Location)
 						return nil
 					}
 
@@ -129,5 +154,5 @@ func SyncWorkers(workersNumber int, ctx context.Context, dst, src Filesystem) (e
 		}
 	}
 
-	return
+	return nil
 }

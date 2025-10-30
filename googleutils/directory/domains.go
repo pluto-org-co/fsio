@@ -3,6 +3,8 @@ package directory
 import (
 	"context"
 	"iter"
+	"slices"
+	"strings"
 
 	admin "google.golang.org/api/admin/directory/v1"
 )
@@ -19,6 +21,8 @@ func SeqDomains(ctx context.Context, svc *admin.Service) (seq iter.Seq[*admin.Do
 			// TODO: Do something with the error
 			return
 		}
+
+		slices.SortFunc(domains.Domains, func(a, b *admin.Domains) int { return strings.Compare(a.DomainName, b.DomainName) })
 
 		for _, domain := range domains.Domains {
 			if !yield(domain) {
