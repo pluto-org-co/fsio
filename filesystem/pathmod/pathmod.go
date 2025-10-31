@@ -44,6 +44,10 @@ func (p *PathMod) RemoveAll(ctx context.Context, location []string) (err error) 
 	return p.fs.RemoveAll(ctx, location)
 }
 
+func (p *PathMod) Move(ctx context.Context, oldLocation, newLocation []string) (finalLocation []string, err error) {
+	return p.fs.Move(ctx, oldLocation, newLocation)
+}
+
 func New(fs filesystem.Filesystem, f PathModFunc) (p *PathMod) {
 	return &PathMod{
 		fs: fs,

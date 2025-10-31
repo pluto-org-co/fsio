@@ -157,3 +157,7 @@ func (g *Gzip) WriteFile(ctx context.Context, location []string, src io.Reader, 
 func (g *Gzip) RemoveAll(ctx context.Context, location []string) (err error) {
 	return g.fs.RemoveAll(ctx, location)
 }
+
+func (g *Gzip) Move(ctx context.Context, oldLocation, newLocation []string) (finalLocation []string, err error) {
+	return g.fs.Move(ctx, oldLocation, newLocation)
+}

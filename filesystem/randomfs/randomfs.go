@@ -107,3 +107,9 @@ func (r *Random) RemoveAll(ctx context.Context, location []string) (err error) {
 	delete(r.locations, path.Join(location...))
 	return nil
 }
+
+func (r *Random) Move(ctx context.Context, oldLocation, newLocation []string) (finalLocation []string, err error) {
+	delete(r.locations, path.Join(oldLocation...))
+	r.locations[path.Join(newLocation...)] = struct{}{}
+	return newLocation, nil
+}

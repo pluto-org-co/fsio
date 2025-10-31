@@ -101,11 +101,11 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 
 				modTime := time.Now()
 
-				targetFilename, err := testFs.WriteFile(ctx, GenerateFilename(5), randSrc, modTime)
+				targetLocation, err := testFs.WriteFile(ctx, GenerateFilename(5), randSrc, modTime)
 				if !assertions.Nil(err, "failed to write random data to temporary file") {
 					return
 				}
-				defer testFs.RemoveAll(ctx, targetFilename)
+				defer testFs.RemoveAll(ctx, targetLocation)
 
 				t.Logf("WritFile Bytes count: %d", counter.Count())
 
@@ -116,7 +116,7 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 					t.Run("Sha256", func(t *testing.T) {
 						assertions := assert.New(t)
 
-						fsChecksum, err := testFs.ChecksumSha256(ctx, targetFilename)
+						fsChecksum, err := testFs.ChecksumSha256(ctx, targetLocation)
 						if !assertions.Nil(err, "failed to compute file checksum") {
 							return
 						}
@@ -133,7 +133,7 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 					t.Run("Time", func(t *testing.T) {
 						assertions := assert.New(t)
 
-						fsChecksum, err := testFs.ChecksumTime(ctx, targetFilename)
+						fsChecksum, err := testFs.ChecksumTime(ctx, targetLocation)
 						if !assertions.Nil(err, "failed to compute file checksum") {
 							return
 						}
@@ -155,7 +155,7 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 					ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 					defer cancel()
 
-					rc, err := testFs.Open(ctx, targetFilename)
+					rc, err := testFs.Open(ctx, targetLocation)
 					if !assertions.Nil(err, "failed to open file") {
 						return
 					}
@@ -170,12 +170,36 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 
 					assertions.Equal(referenceChecksum, openChecksum, "reference checksum must match open checksum")
 				})
+				t.Run("Moving File", func(t *testing.T) {
+					assertions := assert.New(t)
+
+					ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
+					defer cancel()
+
+					rc, err := testFs.Open(ctx, targetLocation)
+					if !assertions.Nil(err, "failed to open file") {
+						return
+					}
+					defer rc.Close()
+
+					oldLocation, err := testFs.WriteFile(ctx, GenerateFilename(5), rc, time.Now())
+					if !assertions.Nil(err, "failed to write random data to temporary file") {
+						return
+					}
+					defer testFs.RemoveAll(ctx, targetLocation)
+
+					newLocation := GenerateFilename(5)
+					_, err = testFs.Move(ctx, oldLocation, newLocation)
+					if !assertions.Nil(err, "failed to handle moving file") {
+						return
+					}
+				})
 				t.Run("Timeout", func(t *testing.T) {
 					assertions := assert.New(t)
 
 					openCtx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 					defer cancel()
-					original, err := testFs.Open(openCtx, targetFilename)
+					original, err := testFs.Open(openCtx, targetLocation)
 					if !assertions.Nil(err, "failed to open file for second write test") {
 						return
 					}

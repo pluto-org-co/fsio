@@ -196,3 +196,20 @@ func (l *Directory) RemoveAll(ctx context.Context, location []string) (err error
 
 	return os.Remove(filename)
 }
+
+func (l *Directory) Move(ctx context.Context, oldLocation, newLocation []string) (finalLocation []string, err error) {
+	oldFilename := path.Join(l.baseDirectory, path.Clean(path.Join(oldLocation...)))
+	newFilename := path.Join(l.baseDirectory, path.Clean(path.Join(newLocation...)))
+
+	newDir, _ := path.Split(newFilename)
+	err = os.MkdirAll(newDir, l.dirPerm)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	err = os.Rename(oldFilename, newFilename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to rename file: %w", err)
+	}
+	return newLocation, nil
+}

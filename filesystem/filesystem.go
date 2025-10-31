@@ -42,4 +42,6 @@ type Filesystem interface {
 	WriteFile(ctx context.Context, location []string, src io.Reader, modTime time.Time) (finalLocation []string, err error)
 	// Remove the path from the filesystem
 	RemoveAll(ctx context.Context, location []string) (err error)
+	// Move a file to a new location
+	Move(ctx context.Context, oldLocation, newLocation []string) (finalLocation []string, err error)
 }

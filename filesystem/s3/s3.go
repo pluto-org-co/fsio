@@ -257,3 +257,21 @@ func (s *S3) RemoveAll(ctx context.Context, location []string) (err error) {
 	options := minio.RemoveObjectOptions{}
 	return s.client.RemoveObject(ctx, s.bucket, objectKey, options)
 }
+
+func (s *S3) Move(ctx context.Context, oldLocation, newLocation []string) (finalLocation []string, err error) {
+	oldObjName := path.Join(oldLocation...)
+	newObjName := path.Join(newLocation...)
+
+	dst := minio.CopyDestOptions{Bucket: s.bucket, Object: newObjName}
+	src := minio.CopySrcOptions{Bucket: s.bucket, Object: oldObjName}
+	_, err = s.client.CopyObject(ctx, dst, src)
+	if err != nil {
+		return nil, fmt.Errorf("failed to copy object: %w", err)
+	}
+
+	err = s.client.RemoveObject(ctx, s.bucket, oldObjName, minio.RemoveObjectOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to remove old object: %w", err)
+	}
+	return newLocation, nil
+}

@@ -375,3 +375,7 @@ func (g *GoogleDrive) WriteFile(ctx context.Context, location []string, src io.R
 func (g *GoogleDrive) RemoveAll(ctx context.Context, location []string) (err error) {
 	return errors.New("operation not supported")
 }
+
+func (g *GoogleDrive) Move(ctx context.Context, oldLocation, newLocation []string) (finalLocation []string, err error) {
+	return nil, errors.New("operation not supported")
+}
