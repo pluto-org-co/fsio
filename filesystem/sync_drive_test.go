@@ -224,6 +224,19 @@ func Test_SyncDrive(t *testing.T) {
 					return
 				}
 			})
+			t.Run("Iterating files", func(t *testing.T) {
+				assertions := assert.New(t)
+
+				ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
+				defer cancel()
+
+				var count int
+				for entry := range dst.Files(ctx) {
+					count++
+					t.Logf("- Location: %s", entry.Location())
+				}
+				assertions.NotZero(count, "expecting at least one value synced")
+			})
 		})
 	})
 }

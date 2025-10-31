@@ -67,7 +67,7 @@ func SeqFilesFromFilesListCall(ctx context.Context, rootId string, baseCall func
 					err := baseCall().
 						PageSize(1_000).
 						Q(fmt.Sprintf("trashed=false and '%s' in parents", pendingDir.id)).
-						Fields("nextPageToken,files(id,name,fullFileExtension,mimeType)").
+						Fields("nextPageToken,files(id,name,fullFileExtension,mimeType,modifiedTime)").
 						OrderBy("name").
 						Pages(ctx, func(fl *drive.FileList) (err error) {
 							if done.Load() {

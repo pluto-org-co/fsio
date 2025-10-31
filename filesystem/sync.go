@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"sync"
-	"time"
 )
 
 type SyncCtx struct {
@@ -31,8 +30,6 @@ func Sync(ctx context.Context, dst, src Filesystem, options ...SyncOption) (err 
 		option(syncCtx)
 	}
 
-	now := time.Now()
-
 	var count int64
 	for entry := range src.Files(ctx) {
 		if syncCtx.MaxFiles > 0 && count >= syncCtx.MaxFiles {
@@ -56,13 +53,13 @@ func Sync(ctx context.Context, dst, src Filesystem, options ...SyncOption) (err 
 					return nil
 				}
 
-				file, err := src.Open(ctx, entry.Location())
+				srcFile, err := src.Open(ctx, entry.Location())
 				if err != nil {
 					return fmt.Errorf("failed to open src file: %w", err)
 				}
-				defer file.Close()
+				defer srcFile.Close()
 
-				_, err = dst.WriteFile(ctx, entry.Location(), file, now)
+				_, err = dst.WriteFile(ctx, entry.Location(), srcFile, entry.ModTime())
 				if err != nil {
 					return fmt.Errorf("failed to write dst file: %w", err)
 				}
@@ -89,8 +86,6 @@ func SyncWorkers(workersNumber int, ctx context.Context, dst, src Filesystem, op
 	for _, option := range options {
 		option(syncCtx)
 	}
-
-	now := time.Now()
 
 	var workers = make(chan struct{}, workersNumber)
 	for range workersNumber {
@@ -140,7 +135,7 @@ func SyncWorkers(workersNumber int, ctx context.Context, dst, src Filesystem, op
 					}
 					defer srcFile.Close()
 
-					_, err = dst.WriteFile(ctx, entry.Location(), srcFile, now)
+					_, err = dst.WriteFile(ctx, entry.Location(), srcFile, entry.ModTime())
 					if err != nil {
 						return fmt.Errorf("failed to write dst file: %w", err)
 					}
