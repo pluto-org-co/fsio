@@ -28,7 +28,7 @@ func (p *PathMod) ChecksumSha256(ctx context.Context, location []string) (checks
 	return p.fs.ChecksumSha256(ctx, location)
 }
 
-func (p *PathMod) Files(ctx context.Context) (seq iter.Seq[*filesystem.FileEntry]) {
+func (p *PathMod) Files(ctx context.Context) (seq iter.Seq[filesystem.FileEntry]) {
 	return p.fs.Files(ctx)
 }
 

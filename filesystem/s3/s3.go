@@ -113,7 +113,7 @@ func LastModifiedFromObj(obj *minio.ObjectInfo) (lastModified time.Time) {
 	return lastModified
 }
 
-func (s *S3) Files(ctx context.Context) (seq iter.Seq[*filesystem.FileEntry]) {
+func (s *S3) Files(ctx context.Context) (seq iter.Seq[filesystem.FileEntry]) {
 	options := minio.ListObjectsOptions{
 		WithMetadata: true,
 		Recursive:    true,
@@ -121,7 +121,7 @@ func (s *S3) Files(ctx context.Context) (seq iter.Seq[*filesystem.FileEntry]) {
 
 	objInfoIter := s.client.ListObjectsIter(ctx, s.bucket, options)
 
-	return func(yield func(*filesystem.FileEntry) bool) {
+	return func(yield func(filesystem.FileEntry) bool) {
 		for objInfo := range objInfoIter {
 			if objInfo.Err != nil {
 				return
@@ -129,9 +129,9 @@ func (s *S3) Files(ctx context.Context) (seq iter.Seq[*filesystem.FileEntry]) {
 
 			lastModified := LastModifiedFromObj(&objInfo)
 
-			entry := &filesystem.FileEntry{
-				Location: strings.Split(objInfo.Key, "/"),
-				ModTime:  lastModified,
+			entry := &filesystem.SimpleFileEntry{
+				LocationValue: strings.Split(objInfo.Key, "/"),
+				ModTimeValue:  lastModified,
 			}
 
 			if !yield(entry) {

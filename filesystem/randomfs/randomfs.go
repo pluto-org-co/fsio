@@ -55,16 +55,16 @@ func (r *Random) ChecksumSha256(ctx context.Context, location []string) (checksu
 	return checksum, nil
 }
 
-func (r *Random) Files(ctx context.Context) (seq iter.Seq[*filesystem.FileEntry]) {
-	return func(yield func(*filesystem.FileEntry) bool) {
+func (r *Random) Files(ctx context.Context) (seq iter.Seq[filesystem.FileEntry]) {
+	return func(yield func(filesystem.FileEntry) bool) {
 		for location := range r.locations {
 			select {
 			case <-ctx.Done():
 				return
 			default:
-				if !yield(&filesystem.FileEntry{
-					Location: strings.Split(location, "/"),
-					ModTime:  time.Date(2005, 01, 01, 01, 0, 0, 0, time.UTC),
+				if !yield(&filesystem.SimpleFileEntry{
+					LocationValue: strings.Split(location, "/"),
+					ModTimeValue:  time.Date(2005, 01, 01, 01, 0, 0, 0, time.UTC),
 				}) {
 					return
 				}

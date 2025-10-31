@@ -12,23 +12,23 @@ func Copy(ctx context.Context, dst, src Filesystem) (err error) {
 
 	for entry := range src.Files(ctx) {
 		err = func() (err error) {
-			srcChecksum, err := src.ChecksumTime(ctx, entry.Location)
+			srcChecksum, err := src.ChecksumTime(ctx, entry.Location())
 			if err != nil {
 				return fmt.Errorf("failed to get src checksum: %w", err)
 			}
 
-			dstChecksum, _ := dst.ChecksumTime(ctx, entry.Location)
+			dstChecksum, _ := dst.ChecksumTime(ctx, entry.Location())
 			if srcChecksum != "" && srcChecksum == dstChecksum {
 				return nil
 			}
 
-			file, err := src.Open(ctx, entry.Location)
+			file, err := src.Open(ctx, entry.Location())
 			if err != nil {
 				return fmt.Errorf("failed to open src file: %w", err)
 			}
 			defer file.Close()
 
-			_, err = dst.WriteFile(ctx, entry.Location, file, now)
+			_, err = dst.WriteFile(ctx, entry.Location(), file, now)
 			if err != nil {
 				return fmt.Errorf("failed to write dst file: %w", err)
 			}
@@ -71,23 +71,23 @@ func CopyWorkers(workersNumber int, ctx context.Context, dst, src Filesystem) (e
 				defer func() { workers <- struct{}{} }()
 
 				err = func() (err error) {
-					srcChecksum, err := src.ChecksumTime(ctx, entry.Location)
+					srcChecksum, err := src.ChecksumTime(ctx, entry.Location())
 					if err != nil {
 						return fmt.Errorf("failed to get src checksum: %w", err)
 					}
 
-					dstChecksum, _ := dst.ChecksumTime(ctx, entry.Location)
+					dstChecksum, _ := dst.ChecksumTime(ctx, entry.Location())
 					if srcChecksum != "" && srcChecksum == dstChecksum {
 						return nil
 					}
 
-					srcFile, err := src.Open(ctx, entry.Location)
+					srcFile, err := src.Open(ctx, entry.Location())
 					if err != nil {
 						return fmt.Errorf("failed to open src file: %w", err)
 					}
 					defer srcFile.Close()
 
-					_, err = dst.WriteFile(ctx, entry.Location, srcFile, now)
+					_, err = dst.WriteFile(ctx, entry.Location(), srcFile, now)
 					if err != nil {
 						return fmt.Errorf("failed to write dst file: %w", err)
 					}

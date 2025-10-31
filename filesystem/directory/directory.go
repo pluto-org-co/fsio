@@ -65,10 +65,10 @@ func (l *Directory) ChecksumSha256(ctx context.Context, location []string) (chec
 	return checksum, nil
 }
 
-func (l *Directory) Files(ctx context.Context) (seq iter.Seq[*filesystem.FileEntry]) {
+func (l *Directory) Files(ctx context.Context) (seq iter.Seq[filesystem.FileEntry]) {
 	conf := fastwalk.DefaultConfig
 
-	worker := make(chan *filesystem.FileEntry, 10_000)
+	worker := make(chan *filesystem.SimpleFileEntry, 10_000)
 	closeCh := make(chan struct{}, 1)
 	go func() {
 		defer close(worker)
@@ -91,15 +91,15 @@ func (l *Directory) Files(ctx context.Context) (seq iter.Seq[*filesystem.FileEnt
 
 				filename, _ := filepath.Rel(l.baseDirectory, fileLocation)
 
-				worker <- &filesystem.FileEntry{
-					Location: strings.Split(filename, "/"),
-					ModTime:  info.ModTime(),
+				worker <- &filesystem.SimpleFileEntry{
+					LocationValue: strings.Split(filename, "/"),
+					ModTimeValue:  info.ModTime(),
 				}
 				return nil
 			}
 		})
 	}()
-	return func(yield func(*filesystem.FileEntry) bool) {
+	return func(yield func(filesystem.FileEntry) bool) {
 		defer func() {
 			closeCh <- struct{}{}
 			close(closeCh)

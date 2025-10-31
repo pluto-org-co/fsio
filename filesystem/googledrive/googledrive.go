@@ -239,26 +239,26 @@ func (g *GoogleDrive) ChecksumSha256(ctx context.Context, location []string) (ch
 	return "", fmt.Errorf("file not found: %v", location)
 }
 
-func (g *GoogleDrive) Files(ctx context.Context) (seq iter.Seq[*filesystem.FileEntry]) {
+func (g *GoogleDrive) Files(ctx context.Context) (seq iter.Seq[filesystem.FileEntry]) {
 	baseConf := g.jwtLoader()
 	baseClient := g.ClientFromConf(ctx, baseConf)
 
 	driveSvc, err := drive.NewService(ctx, option.WithHTTPClient(baseClient))
 	if err != nil {
 		log.Printf("failed to get drive service: %v", err)
-		return func(yield func(*filesystem.FileEntry) bool) {}
+		return func(yield func(filesystem.FileEntry) bool) {}
 	}
 
 	adminSvc, _ := admin.NewService(ctx, option.WithHTTPClient(baseClient))
 
-	return func(yield func(*filesystem.FileEntry) bool) {
+	return func(yield func(filesystem.FileEntry) bool) {
 		// Start with the files owned by this account.
 		if g.currentAccount {
 			for location, file := range drives.SeqFiles(ctx, driveSvc) {
 				modTime, _ := time.Parse(time.RFC3339, file.ModifiedTime)
-				entry := &filesystem.FileEntry{
-					Location: g.currentUserFilename(location),
-					ModTime:  modTime,
+				entry := &filesystem.SimpleFileEntry{
+					LocationValue: g.currentUserFilename(location),
+					ModTimeValue:  modTime,
 				}
 				if !yield(entry) {
 					return
@@ -270,9 +270,9 @@ func (g *GoogleDrive) Files(ctx context.Context) (seq iter.Seq[*filesystem.FileE
 			for drive := range shareddrives.SeqDrives(ctx, driveSvc) {
 				for location, file := range shareddrives.SeqFiles(ctx, driveSvc, drive.Id) {
 					modTime, _ := time.Parse(time.RFC3339, file.ModifiedTime)
-					entry := &filesystem.FileEntry{
-						Location: g.currentSharedDriveFilename(drive.Name, location),
-						ModTime:  modTime,
+					entry := &filesystem.SimpleFileEntry{
+						LocationValue: g.currentSharedDriveFilename(drive.Name, location),
+						ModTimeValue:  modTime,
 					}
 					if !yield(entry) {
 						return
@@ -294,9 +294,9 @@ func (g *GoogleDrive) Files(ctx context.Context) (seq iter.Seq[*filesystem.FileE
 					}
 					for location, file := range drives.SeqFiles(ctx, userSvc) {
 						modTime, _ := time.Parse(time.RFC3339, file.ModifiedTime)
-						entry := &filesystem.FileEntry{
-							Location: g.userAccountDriveFilename(domain.DomainName, user.PrimaryEmail, location),
-							ModTime:  modTime,
+						entry := &filesystem.SimpleFileEntry{
+							LocationValue: g.userAccountDriveFilename(domain.DomainName, user.PrimaryEmail, location),
+							ModTimeValue:  modTime,
 						}
 						if !yield(entry) {
 							return

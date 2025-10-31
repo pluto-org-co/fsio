@@ -60,13 +60,13 @@ func Test_GoogleDrive(t *testing.T) {
 						break
 					}
 
-					t.Run(path.Join(entry.Location...), func(t *testing.T) {
+					t.Run(path.Join(entry.Location()...), func(t *testing.T) {
 						assertions := assert.New(t)
 
 						ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 						defer cancel()
 
-						rd, err := gd.Open(ctx, entry.Location)
+						rd, err := gd.Open(ctx, entry.Location())
 						if !assertions.Nil(err, "failed to open file") {
 							return
 						}
@@ -83,7 +83,7 @@ func Test_GoogleDrive(t *testing.T) {
 
 							ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 							defer cancel()
-							remoteChecksum, err := gd.ChecksumSha256(ctx, entry.Location)
+							remoteChecksum, err := gd.ChecksumSha256(ctx, entry.Location())
 							if !assertions.Nil(err, "failed to calculate checksum") {
 								return
 							}
@@ -101,7 +101,7 @@ func Test_GoogleDrive(t *testing.T) {
 							ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 							defer cancel()
 
-							remoteChecksum, err := gd.ChecksumSha256(ctx, entry.Location)
+							remoteChecksum, err := gd.ChecksumSha256(ctx, entry.Location())
 							if !assertions.Nil(err, "failed to compute request checksum") {
 								return
 							}

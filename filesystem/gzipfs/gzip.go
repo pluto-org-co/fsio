@@ -49,7 +49,7 @@ func (g *Gzip) ChecksumSha256(ctx context.Context, location []string) (checksum 
 	return checksum, nil
 }
 
-func (g *Gzip) Files(ctx context.Context) (seq iter.Seq[*filesystem.FileEntry]) {
+func (g *Gzip) Files(ctx context.Context) (seq iter.Seq[filesystem.FileEntry]) {
 	return g.fs.Files(ctx)
 }
 
