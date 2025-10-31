@@ -1,0 +1,13 @@
+workers: 100
+drive:
+  account-file: /path/to/redacted/svc-account.json
+  subject: "[REDACTED_ADMIN_EMAIL]"
+  current-account: true
+  shared-drive: true
+  other-users: true
+s3:
+  bucket: bucket-name
+  client-id: "[REDACTED_CLIENT_ID]"
+  client-secret: "[REDACTED_CLIENT_SECRET]"
+  endpoint: "[REDACTED_PRIVATE_ENDPOINT]"
+  cache-expiry: 1m

@@ -229,24 +229,6 @@ func (s *S3) WriteFile(ctx context.Context, location []string, src io.Reader, mo
 		return nil, fmt.Errorf("failed to seek: %w", err)
 	}
 
-	// Calculate checksum
-	hexChecksum, err := ioutils.ChecksumSha256(ctx, srcAsFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to compute checksum: %w", err)
-	}
-
-	rawChecksum, err := hex.DecodeString(hexChecksum)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode hex checksum: %w", err)
-	}
-
-	b64Checksum := base64.StdEncoding.EncodeToString(rawChecksum)
-
-	_, err = srcAsFile.Seek(0, 0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to seek: %w", err)
-	}
-
 	sTime := modTime.Format(ioutils.DefaultTimeLayout)
 
 	_, err = s.client.PutObject(
@@ -255,13 +237,10 @@ func (s *S3) WriteFile(ctx context.Context, location []string, src io.Reader, mo
 		bufio.NewReaderSize(srcAsFile, ioutils.DefaultBufferSize),
 		info.Size(),
 		minio.PutObjectOptions{
-			PartSize:    uint64(info.Size()), // Upload a single part
-			Checksum:    minio.ChecksumSHA256,
 			ContentType: mime.String(),
 			UserMetadata: map[string]string{
-				"x-amz-checksum-sha256": b64Checksum,
-				XAmzMetaMTime:           sTime,
-				XAmzCustomMTime:         sTime,
+				XAmzMetaMTime:   sTime,
+				XAmzCustomMTime: sTime,
 			},
 		},
 	)
