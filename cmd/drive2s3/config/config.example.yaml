@@ -1,4 +1,5 @@
 workers: 100
+interval: 24h
 drive:
   account-file: /path/to/redacted/svc-account.json
   subject: "[REDACTED_ADMIN_EMAIL]"
