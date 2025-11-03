@@ -7,12 +7,11 @@ import (
 	"time"
 
 	"github.com/pluto-org-co/fsio/filesystem/googledrive"
+	"github.com/pluto-org-co/fsio/googleutils"
 	"github.com/pluto-org-co/fsio/googleutils/creds"
 	"github.com/pluto-org-co/fsio/ioutils"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/oauth2/jwt"
-	admin "google.golang.org/api/admin/directory/v1"
-	"google.golang.org/api/drive/v2"
 )
 
 func Test_GoogleDrive(t *testing.T) {
@@ -34,10 +33,7 @@ func Test_GoogleDrive(t *testing.T) {
 				gd := googledrive.New(googledrive.Config{
 					JWTLoader: func() (config *jwt.Config) {
 						config = creds.NewConfiguration(
-							t,
-							admin.AdminDirectoryUserReadonlyScope,
-							admin.AdminDirectoryDomainReadonlyScope,
-							drive.DriveScope,
+							t, googleutils.Scopes...,
 						)
 						config.Subject = creds.UserEmail()
 						return config

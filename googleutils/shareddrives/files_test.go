@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pluto-org-co/fsio/googleutils"
 	"github.com/pluto-org-co/fsio/googleutils/creds"
 	"github.com/pluto-org-co/fsio/googleutils/directory"
 	"github.com/pluto-org-co/fsio/googleutils/shareddrives"
@@ -18,7 +19,7 @@ func Test_SeqFiles(t *testing.T) {
 	t.Run("Succeed", func(t *testing.T) {
 		assertions := assert.New(t)
 
-		conf := creds.NewConfiguration(t, admin.AdminDirectoryUserReadonlyScope, admin.AdminDirectoryDomainReadonlyScope)
+		conf := creds.NewConfiguration(t, googleutils.Scopes...)
 		conf.Subject = creds.UserEmail()
 
 		ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
@@ -40,11 +41,7 @@ func Test_SeqFiles(t *testing.T) {
 					t.Run(u.PrimaryEmail, func(t *testing.T) {
 						assertions := assert.New(t)
 
-						conf := creds.NewConfiguration(t,
-							admin.AdminDirectoryUserReadonlyScope,
-							admin.AdminDirectoryDomainReadonlyScope,
-							gdrive.DriveScope,
-						)
+						conf := creds.NewConfiguration(t, googleutils.Scopes...)
 						conf.Subject = u.PrimaryEmail
 
 						ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)

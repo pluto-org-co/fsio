@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"path"
 	"sync"
 )
 
@@ -126,6 +127,7 @@ func SyncWorkers(workersNumber int, ctx context.Context, dst, src Filesystem, op
 					dstChecksum, _ := dst.ChecksumTime(ctx, entry.Location())
 
 					if srcChecksum != "" && srcChecksum == dstChecksum {
+						log.Println("SKIP:", path.Join(entry.Location()...))
 						return nil
 					}
 

@@ -11,10 +11,9 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/pluto-org-co/fsio/filesystem/googledrive"
 	"github.com/pluto-org-co/fsio/filesystem/s3"
+	"github.com/pluto-org-co/fsio/googleutils"
 	"golang.org/x/oauth2/google"
 	"golang.org/x/oauth2/jwt"
-	admin "google.golang.org/api/admin/directory/v1"
-	"google.golang.org/api/drive/v2"
 )
 
 type (
@@ -67,20 +66,14 @@ func (c *Config) DriveFs(ctx context.Context) (fs *googledrive.GoogleDrive, err 
 		return nil, fmt.Errorf("failed to get account file: %w", err)
 	}
 
-	_, err = google.JWTConfigFromJSON(accountFile,
-		admin.AdminDirectoryUserReadonlyScope,
-		admin.AdminDirectoryDomainReadonlyScope,
-		drive.DriveScope)
+	_, err = google.JWTConfigFromJSON(accountFile, googleutils.Scopes...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare jwt configuration: %w", err)
 	}
 
 	gd := googledrive.New(googledrive.Config{
 		JWTLoader: func() (config *jwt.Config) {
-			config, _ = google.JWTConfigFromJSON(accountFile,
-				admin.AdminDirectoryUserReadonlyScope,
-				admin.AdminDirectoryDomainReadonlyScope,
-				drive.DriveScope)
+			config, _ = google.JWTConfigFromJSON(accountFile, googleutils.Scopes...)
 			config.Subject = c.Drive.Subject
 			return config
 		},

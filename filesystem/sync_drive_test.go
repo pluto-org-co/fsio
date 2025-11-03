@@ -12,13 +12,12 @@ import (
 	"github.com/pluto-org-co/fsio/filesystem"
 	"github.com/pluto-org-co/fsio/filesystem/googledrive"
 	"github.com/pluto-org-co/fsio/filesystem/s3"
+	"github.com/pluto-org-co/fsio/googleutils"
 	"github.com/pluto-org-co/fsio/googleutils/creds"
 	"github.com/stretchr/testify/assert"
 	"github.com/testcontainers/testcontainers-go"
 	miniotc "github.com/testcontainers/testcontainers-go/modules/minio"
 	"golang.org/x/oauth2/jwt"
-	admin "google.golang.org/api/admin/directory/v1"
-	"google.golang.org/api/drive/v3"
 )
 
 func Test_SyncDrive(t *testing.T) {
@@ -37,10 +36,7 @@ func Test_SyncDrive(t *testing.T) {
 		src := googledrive.New(googledrive.Config{
 			JWTLoader: func() (config *jwt.Config) {
 				config = creds.NewConfiguration(
-					t,
-					admin.AdminDirectoryUserReadonlyScope,
-					admin.AdminDirectoryDomainReadonlyScope,
-					drive.DriveScope,
+					t, googleutils.Scopes...,
 				)
 				config.Subject = creds.UserEmail()
 				return config
