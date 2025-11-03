@@ -17,8 +17,10 @@ type gmailMailListEntry struct {
 func SeqMails(ctx context.Context, svc *gmail.Service) (seq iter.Seq[*gmail.Message]) {
 	var done atomic.Bool
 
-	var mailCh = make(chan *gmailMailListEntry, 1_000)
+	var maillistCh = make(chan *gmailMailListEntry, 1_000)
 	go func() {
+		defer close(maillistCh)
+
 		err := svc.
 			Users.Messages.List("me").
 			IncludeSpamTrash(true).
@@ -27,7 +29,7 @@ func SeqMails(ctx context.Context, svc *gmail.Service) (seq iter.Seq[*gmail.Mess
 					return io.EOF
 				}
 
-				mailCh <- &gmailMailListEntry{
+				maillistCh <- &gmailMailListEntry{
 					MailList: lm,
 				}
 				return nil
@@ -41,7 +43,7 @@ func SeqMails(ctx context.Context, svc *gmail.Service) (seq iter.Seq[*gmail.Mess
 	return func(yield func(*gmail.Message) bool) {
 		defer done.Store(true)
 
-		for entry := range mailCh {
+		for entry := range maillistCh {
 			for _, msg := range entry.MailList.Messages {
 				if !yield(msg) {
 					return

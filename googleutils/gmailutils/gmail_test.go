@@ -55,7 +55,7 @@ func Test_SeqMails(t *testing.T) {
 
 						var count int
 						for mail := range gmailutils.SeqMails(ctx, gmailSvc) {
-							t.Logf("Contents: %v", mail)
+							t.Logf("Contents: %v", mail.Id)
 							count++
 							if count >= 5 {
 								break
