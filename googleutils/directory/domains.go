@@ -3,6 +3,7 @@ package directory
 import (
 	"context"
 	"iter"
+	"log"
 	"slices"
 	"strings"
 
@@ -18,6 +19,8 @@ func SeqDomains(ctx context.Context, svc *admin.Service) (seq iter.Seq[*admin.Do
 			List("my_customer").
 			Do()
 		if err != nil {
+
+			log.Println("failed to retrieve domains:", err)
 			// TODO: Do something with the error
 			return
 		}

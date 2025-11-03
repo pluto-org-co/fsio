@@ -3,6 +3,7 @@ package shareddrives
 import (
 	"context"
 	"iter"
+	"log"
 	"slices"
 	"strings"
 
@@ -12,7 +13,7 @@ import (
 // List the drives that the account can access:
 // Requires at least: https://www.googleapis.com/auth/drive
 func SeqDrives(ctx context.Context, svc *drive.Service) (seq iter.Seq[*drive.Drive]) {
-	const MaxPageSize = 1_000
+	const MaxPageSize = 100
 
 	return func(yield func(*drive.Drive) bool) {
 		var drives = make([]*drive.Drive, 0, MaxPageSize)
@@ -25,6 +26,7 @@ func SeqDrives(ctx context.Context, svc *drive.Service) (seq iter.Seq[*drive.Dri
 				return nil
 			})
 		if err != nil {
+			log.Println("failed to retrieve drives:", err)
 			// TODO: What should this do with the error?
 			return
 		}

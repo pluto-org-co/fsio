@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"log"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -89,6 +90,8 @@ func SeqFilesFromFilesListCall(ctx context.Context, rootId string, baseCall func
 				wg.Go(func() {
 					defer func() {
 						if err := recover(); err != nil {
+
+							log.Println("failed to retrieve files:", err)
 							// TODO: Log on DEV builds
 						}
 					}()

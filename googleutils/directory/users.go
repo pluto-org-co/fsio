@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"iter"
+	"log"
 
 	admin "google.golang.org/api/admin/directory/v1"
 )
@@ -21,7 +22,7 @@ func SeqUsers(ctx context.Context, svc *admin.Service, domain string) (seq iter.
 			List().
 			Context(ctx).
 			Domain(domain).
-			OrderBy("primaryEmail").
+			OrderBy("email").
 			Pages(ctx, func(u *admin.Users) (err error) {
 				select {
 				case usersCh <- u:
@@ -31,6 +32,7 @@ func SeqUsers(ctx context.Context, svc *admin.Service, domain string) (seq iter.
 				}
 			})
 		if err != nil {
+			log.Println("failed to retrieve users:", err)
 			// TODO: What should this do with the error?
 		}
 	}()
