@@ -23,7 +23,7 @@ func CopyContext(ctx context.Context, dst io.Writer, src io.Reader, size int64) 
 				if errors.Is(err, io.EOF) {
 					return n, nil
 				}
-				return n, fmt.Errorf("failed to copy chunk: %w", err)
+				return n, fmt.Errorf("failed to copy chunk: %w: could write at least %d", err, n)
 			}
 		}
 	}

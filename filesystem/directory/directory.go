@@ -47,7 +47,7 @@ func (l *Directory) ChecksumTime(ctx context.Context, location []string) (checks
 		return "", fmt.Errorf("failed to get file info: %w", err)
 	}
 
-	checksum = ioutils.ChecksumTime(info.ModTime(), info.Size())
+	checksum = ioutils.ChecksumTime(info.ModTime())
 	return checksum, nil
 }
 

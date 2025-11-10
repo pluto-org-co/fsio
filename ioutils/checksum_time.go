@@ -1,12 +1,11 @@
 package ioutils
 
 import (
-	"fmt"
 	"time"
 )
 
 const DefaultTimeLayout = time.RFC822Z
 
-func ChecksumTime(modTime time.Time, size int64) (checksum string) {
-	return fmt.Sprintf("%s-%d", modTime.Format(DefaultTimeLayout), size)
+func ChecksumTime(modTime time.Time) (checksum string) {
+	return modTime.Format(DefaultTimeLayout)
 }

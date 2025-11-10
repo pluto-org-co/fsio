@@ -1,6 +1,7 @@
 package testsuite
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -12,8 +13,8 @@ import (
 
 	"github.com/pluto-org-co/fsio/filesystem"
 	"github.com/pluto-org-co/fsio/filesystem/randomfs"
+	"github.com/pluto-org-co/fsio/filesystem/testsuite/samplesfiles"
 	"github.com/pluto-org-co/fsio/ioutils"
-	"github.com/pluto-org-co/fsio/random"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -89,19 +90,16 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 			t.Run("Write", func(t *testing.T) {
 				assertions := assert.New(t)
 
-				const fileSize = 100 * 1024 * 1024
-				randSrc := io.LimitReader(random.InsecureReader, fileSize)
-
 				referenceChecksumHash := sha256.New()
 				counter := ioutils.NewCountWriter(referenceChecksumHash)
-				randSrc = io.TeeReader(randSrc, counter)
+				src := io.TeeReader(bytes.NewReader(samplesfiles.Lorem), counter)
 
 				ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 				defer cancel()
 
 				modTime := time.Now()
 
-				targetLocation, err := testFs.WriteFile(ctx, GenerateFilename(5), randSrc, modTime)
+				targetLocation, err := testFs.WriteFile(ctx, GenerateFilename(5), src, modTime)
 				if !assertions.Nil(err, "failed to write random data to temporary file") {
 					return
 				}
@@ -143,7 +141,7 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 						}
 						t.Logf("FS Checksum: %s", fsChecksum)
 
-						if !assertions.Equal(fsChecksum, ioutils.ChecksumTime(modTime, counter.Count()), "reference checksum doesn't match with the one provided by the FS") {
+						if !assertions.Equal(fsChecksum, ioutils.ChecksumTime(modTime), "reference checksum doesn't match with the one provided by the FS") {
 							return
 						}
 					})
@@ -186,7 +184,6 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 					if !assertions.Nil(err, "failed to write random data to temporary file") {
 						return
 					}
-					defer testFs.RemoveAll(ctx, targetLocation)
 
 					newLocation := GenerateFilename(5)
 					_, err = testFs.Move(ctx, oldLocation, newLocation)
@@ -210,7 +207,7 @@ func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.
 
 					var targetFilename2 = GenerateFilename(5)
 
-					writeCtx, cancel := context.WithTimeout(context.TODO(), time.Microsecond)
+					writeCtx, cancel := context.WithDeadline(context.TODO(), time.Now().Add(-time.Second))
 					defer cancel()
 					_, err = testFs.WriteFile(writeCtx, targetFilename2, randSrc, time.Now())
 					defer testFs.RemoveAll(ctx, targetFilename2)

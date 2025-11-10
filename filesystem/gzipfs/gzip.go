@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"iter"
@@ -11,19 +12,27 @@ import (
 	"time"
 
 	"github.com/gabriel-vasile/mimetype"
-	"github.com/klauspost/compress/gzip"
+	gzip "github.com/klauspost/pgzip"
 	"github.com/pluto-org-co/fsio/filesystem"
 	"github.com/pluto-org-co/fsio/filesystem/utils"
 	"github.com/pluto-org-co/fsio/ioutils"
+	"github.com/pluto-org-co/fsio/pool"
 )
 
 type Gzip struct {
-	level int
-	fs    filesystem.Filesystem
+	readerPool *pool.Pool[gzip.Reader]
+	writerPool *pool.Pool[gzip.Writer]
+	level      int
+	fs         filesystem.Filesystem
 }
 
 func New(level int, fs filesystem.Filesystem) (g *Gzip) {
 	return &Gzip{
+		readerPool: pool.New[gzip.Reader](),
+		writerPool: pool.NewWithFunc[gzip.Writer](func() (v *gzip.Writer) {
+			v, _ = gzip.NewWriterLevel(nil, level)
+			return v
+		}),
 		level: level,
 		fs:    fs,
 	}
@@ -54,7 +63,20 @@ func (g *Gzip) Files(ctx context.Context) (seq iter.Seq[filesystem.FileEntry]) {
 }
 
 type gzipReader struct {
-	rc io.ReadCloser
+	file io.ReadCloser
+	gzip *gzip.Reader
+	pool *pool.Pool[gzip.Reader]
+}
+
+func (r *gzipReader) Read(b []byte) (n int, err error) {
+	return r.gzip.Read(b)
+}
+
+func (r *gzipReader) Close() (err error) {
+	r.gzip.Close()
+	r.file.Close()
+	r.pool.Put(r.gzip)
+	return nil
 }
 
 func (g *Gzip) Open(ctx context.Context, location []string) (rc io.ReadCloser, err error) {
@@ -77,39 +99,49 @@ func (g *Gzip) Open(ctx context.Context, location []string) (rc io.ReadCloser, e
 	}
 
 	reader := io.MultiReader(bytes.NewReader(buffer.Bytes()), file)
-	if mime.Is("application/gzip") {
-		reader, err = gzip.NewReader(reader)
-		if err != nil {
-			return nil, fmt.Errorf("failed to prepare gzip reader: %w", err)
-		}
+	if !mime.Is("application/gzip") {
+		rc = utils.NewSeparateReadCloser(file, reader)
+		return rc, nil
 	}
 
-	rc = utils.NewSeparateReadCloser(file, reader)
+	gzReader := g.readerPool.Get()
+	err = gzReader.Reset(reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare gzip reader: %w", err)
+	}
+
+	rc = &gzipReader{
+		file: file,
+		gzip: gzReader,
+		pool: g.readerPool,
+	}
 	return rc, nil
 }
 
 func (g *Gzip) WriteFile(ctx context.Context, location []string, src io.Reader, modTime time.Time) (finalLocation []string, err error) {
 	rawFile, err := os.CreateTemp("", "*")
 	if err != nil {
-		return location, fmt.Errorf("failed to create temporary raw file: %w", err)
+		return nil, fmt.Errorf("failed to create temporary raw file: %w", err)
 	}
 	defer rawFile.Close()
 	defer os.Remove(rawFile.Name())
 
 	compressedFile, err := os.CreateTemp("", "*")
 	if err != nil {
-		return location, fmt.Errorf("failed to create temporary gzip file: %w", err)
+		return nil, fmt.Errorf("failed to create temporary gzip file: %w", err)
 	}
 	defer compressedFile.Close()
 	defer os.Remove(compressedFile.Name())
 
 	// Gzip Writer
-	gzipWriter, err := gzip.NewWriterLevel(compressedFile, g.level)
-	if err != nil {
-		return location, fmt.Errorf("failed to prepare  gzip writer: %w", err)
+	gzWriter := g.writerPool.Get()
+	if gzWriter == nil {
+		return nil, errors.New("failed to create gzip writer: verify level is correct")
 	}
+	gzWriter.Reset(compressedFile)
+	defer g.writerPool.Put(gzWriter)
 
-	dst := bufio.NewWriterSize(io.MultiWriter(gzipWriter, rawFile), ioutils.DefaultBufferSize)
+	dst := bufio.NewWriterSize(io.MultiWriter(gzWriter, rawFile), ioutils.DefaultBufferSize)
 
 	switch src.(type) {
 	case *bufio.Reader:
@@ -120,17 +152,17 @@ func (g *Gzip) WriteFile(ctx context.Context, location []string, src io.Reader, 
 
 	_, err = ioutils.CopyContext(ctx, dst, src, ioutils.DefaultBufferSize)
 	if err != nil {
-		return location, fmt.Errorf("failed to copy contents: %w", err)
+		return nil, fmt.Errorf("failed to copy contents: %w", err)
 	}
 
 	err = dst.Flush()
 	if err != nil {
-		return location, fmt.Errorf("failed to flush buffered writer: %w", err)
+		return nil, fmt.Errorf("failed to flush buffered writer: %w", err)
 	}
 
-	err = gzipWriter.Close()
+	err = gzWriter.Close()
 	if err != nil {
-		return location, fmt.Errorf("failed to close gzip writer: %w", err)
+		return nil, fmt.Errorf("failed to close gzip writer: %w", err)
 	}
 
 	// Write to target
@@ -139,12 +171,12 @@ func (g *Gzip) WriteFile(ctx context.Context, location []string, src io.Reader, 
 
 	rawInfo, err := rawFile.Stat()
 	if err != nil {
-		return location, fmt.Errorf("failed to get raw file info: %w", err)
+		return nil, fmt.Errorf("failed to get raw file info: %w", err)
 	}
 
 	compressedInfo, err := compressedFile.Stat()
 	if err != nil {
-		return location, fmt.Errorf("failed to get compressed file info: %w", err)
+		return nil, fmt.Errorf("failed to get compressed file info: %w", err)
 	}
 
 	if compressedInfo.Size() < rawInfo.Size() {

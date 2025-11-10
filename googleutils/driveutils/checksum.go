@@ -31,7 +31,7 @@ func ChecksumTime(ctx context.Context, svc *drive.Service, driveFile bool, fileI
 		return "", fmt.Errorf("failed to parse modifiedTime: %w", err)
 	}
 
-	checksum = ioutils.ChecksumTime(modTime, info.Size)
+	checksum = ioutils.ChecksumTime(modTime)
 	return checksum, nil
 }
 

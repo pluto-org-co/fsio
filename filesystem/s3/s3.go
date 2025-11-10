@@ -48,7 +48,7 @@ func (s *S3) ChecksumTime(ctx context.Context, location []string) (checksum stri
 		return "", fmt.Errorf("failed to get object information: %w", err)
 	}
 
-	checksum = ioutils.ChecksumTime(LastModifiedFromObj(&objInfo), objInfo.Size)
+	checksum = ioutils.ChecksumTime(LastModifiedFromObj(&objInfo))
 	return checksum, nil
 }
 
