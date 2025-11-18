@@ -1,0 +1,46 @@
+# Copyright (C) 2025 ZedCloud Org.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+networks:
+  application:
+    internal: false
+
+services:
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    networks:
+      - application
+    ports:
+          # S3 API port (9000:9000)
+          - name: s3-api
+            protocol: tcp
+            published: 9000
+            target: 9000
+          # MinIO Console/Web UI port (9001:9001)
+          - name: minio-web
+            protocol: tcp
+            published: 9001
+            target: 9001
+    environment:
+      MINIO_ROOT_USER: administrator
+      MINIO_ROOT_PASSWORD: administrator
+    volumes:
+      - minio_data:/data
+
+volumes:
+  minio_data:

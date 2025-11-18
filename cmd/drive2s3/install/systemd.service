@@ -1,0 +1,14 @@
+[Unit]
+Description=Drive to S3
+After=network.target
+
+[Service]
+Type=simple
+User=drive2s3
+WorkingDirectory=/home/drive2s3
+ExecStart=/usr/bin/drive2s3 run --config /etc/drive2s3/config.yaml
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,242 @@
+// Copyright (C) 2025 ZedCloud Org.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published
+// by the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+package testsuite
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"io"
+	"iter"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/pluto-org-co/fsio/filesystem"
+	"github.com/pluto-org-co/fsio/filesystem/randomfs"
+	"github.com/pluto-org-co/fsio/filesystem/testsuite/samplesfiles"
+	"github.com/pluto-org-co/fsio/ioutils"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestFilesystem(t *testing.T, baseFs filesystem.Filesystem) func(t *testing.T) {
+	assertions := assert.New(t)
+
+	files := GenerateLocations(100)
+
+	randomRoot := randomfs.New(files, 32*1024*1024)
+
+	ctxCopy, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	err := filesystem.CopyWorkers(100, ctxCopy, baseFs, randomRoot)
+	if !assertions.Nil(err, "failed to copy fs contents") {
+		return func(t *testing.T) {}
+	}
+
+	return func(t *testing.T) {
+		t.Run("Succeed", func(t *testing.T) {
+			if os.Getuid() == 0 {
+				t.Skip("Can't run this test as root")
+				return
+			}
+
+			testFs := baseFs
+
+			t.Run("Files", func(t *testing.T) {
+				assertions := assert.New(t)
+
+				ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
+				defer cancel()
+
+				var count int
+				for range testFs.Files(ctx) {
+					count++
+				}
+				assertions.NotZero(count, "should found the expected number of files")
+				t.Logf("Found: %v", count)
+
+				t.Run("EarlyBreak", func(t *testing.T) {
+					assertions := assert.New(t)
+
+					ctx, cancel := context.WithTimeout(context.TODO(), time.Microsecond)
+					defer cancel()
+
+					pull, stop := iter.Pull(testFs.Files(ctx))
+					for range 10 {
+						_, valid := pull()
+						if !valid {
+							break
+						}
+					}
+					stop()
+
+					_, valid := pull()
+					assertions.False(valid, "should be invalid after stop()")
+				})
+				t.Run("Timeout", func(t *testing.T) {
+					assertions := assert.New(t)
+
+					ctx, cancel := context.WithTimeout(context.TODO(), time.Microsecond)
+					defer cancel()
+
+					var timeoutCount int
+					for range testFs.Files(ctx) {
+						timeoutCount++
+					}
+					assertions.Less(timeoutCount, count, "should not find all files due to timeout")
+				})
+			})
+
+			t.Run("Write", func(t *testing.T) {
+				assertions := assert.New(t)
+
+				referenceChecksumHash := sha256.New()
+				counter := ioutils.NewCountWriter(referenceChecksumHash)
+				src := io.TeeReader(bytes.NewReader(samplesfiles.Lorem), counter)
+
+				ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
+				defer cancel()
+
+				modTime := time.Now()
+
+				targetLocation, err := testFs.WriteFile(ctx, GenerateFilename(5), src, modTime)
+				if !assertions.Nil(err, "failed to write random data to temporary file") {
+					return
+				}
+				defer testFs.RemoveAll(ctx, targetLocation)
+
+				t.Logf("WritFile Bytes count: %d", counter.Count())
+
+				referenceChecksum := hex.EncodeToString(referenceChecksumHash.Sum(nil))
+				t.Logf("Reference Checksum: %s", referenceChecksum)
+
+				t.Run("FS Checksum", func(t *testing.T) {
+					t.Run("Sha256", func(t *testing.T) {
+						assertions := assert.New(t)
+
+						fsChecksum, err := testFs.ChecksumSha256(ctx, targetLocation)
+						if !assertions.Nil(err, "failed to compute file checksum") {
+							return
+						}
+
+						if !assertions.NotEmpty(fsChecksum, "failed to request file checksum") {
+							return
+						}
+						t.Logf("FS Checksum: %s", fsChecksum)
+
+						if !assertions.Equal(fsChecksum, referenceChecksum, "reference checksum doesn't match with the one provided by the FS") {
+							return
+						}
+					})
+					t.Run("Time", func(t *testing.T) {
+						assertions := assert.New(t)
+
+						fsChecksum, err := testFs.ChecksumTime(ctx, targetLocation)
+						if !assertions.Nil(err, "failed to compute file checksum") {
+							return
+						}
+
+						if !assertions.NotEmpty(fsChecksum, "failed to request file checksum") {
+							return
+						}
+						t.Logf("FS Checksum: %s", fsChecksum)
+
+						if !assertions.Equal(fsChecksum, ioutils.ChecksumTime(modTime), "reference checksum doesn't match with the one provided by the FS") {
+							return
+						}
+					})
+				})
+
+				t.Run("Open checksum", func(t *testing.T) {
+					assertions := assert.New(t)
+
+					ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
+					defer cancel()
+
+					rc, err := testFs.Open(ctx, targetLocation)
+					if !assertions.Nil(err, "failed to open file") {
+						return
+					}
+					defer rc.Close()
+
+					openChecksum, err := ioutils.ChecksumSha256(ctx, rc)
+					if !assertions.Nil(err, "failed to compute checksum") {
+						return
+					}
+
+					t.Logf("Last checksum writes: %d", counter.Count())
+
+					assertions.Equal(referenceChecksum, openChecksum, "reference checksum must match open checksum")
+				})
+				t.Run("Moving File", func(t *testing.T) {
+					assertions := assert.New(t)
+
+					ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
+					defer cancel()
+
+					rc, err := testFs.Open(ctx, targetLocation)
+					if !assertions.Nil(err, "failed to open file") {
+						return
+					}
+					defer rc.Close()
+
+					oldLocation, err := testFs.WriteFile(ctx, GenerateFilename(5), rc, time.Now())
+					if !assertions.Nil(err, "failed to write random data to temporary file") {
+						return
+					}
+
+					newLocation := GenerateFilename(5)
+					_, err = testFs.Move(ctx, oldLocation, newLocation)
+					if !assertions.Nil(err, "failed to handle moving file") {
+						return
+					}
+				})
+				t.Run("Timeout", func(t *testing.T) {
+					assertions := assert.New(t)
+
+					openCtx, cancel := context.WithTimeout(context.TODO(), time.Minute)
+					defer cancel()
+					original, err := testFs.Open(openCtx, targetLocation)
+					if !assertions.Nil(err, "failed to open file for second write test") {
+						return
+					}
+					defer original.Close()
+
+					lastChecksumHash := sha256.New()
+					randSrc := io.TeeReader(original, lastChecksumHash)
+
+					var targetFilename2 = GenerateFilename(5)
+
+					writeCtx, cancel := context.WithDeadline(context.TODO(), time.Now().Add(-time.Second))
+					defer cancel()
+					_, err = testFs.WriteFile(writeCtx, targetFilename2, randSrc, time.Now())
+					defer testFs.RemoveAll(ctx, targetFilename2)
+
+					if !assertions.NotNil(err, "should fail to write file due to short timeout") {
+						return
+					}
+
+					lastChecksum := hex.EncodeToString(lastChecksumHash.Sum(nil))
+					if !assertions.NotEqual(referenceChecksum, lastChecksum, "checksums should not match because the write was incomplete/timed out") {
+						return
+					}
+				})
+			})
+		})
+	}
+}
