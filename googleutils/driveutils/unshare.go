@@ -24,10 +24,8 @@ func Unshare(ctx context.Context, svc *drive.Service, fileId string, permissions
 			EnforceExpansiveAccess(true).
 			Do()
 		if err != nil {
-			slog.Warn("Failed to remove permission",
+			slog.Debug("Failed to remove permission",
 				"file-id", fileId,
-				"permission-subject", permission.EmailAddress,
-				"role", permission.Role,
 				"error-msg", err,
 			)
 		}
@@ -40,7 +38,8 @@ func UnshareAll(ctx context.Context, svc *drive.Service, fileId string) (err err
 	var permissions []*drive.Permission
 	err = svc.Permissions.
 		List(fileId).
-		Fields("nextPageToken,permissions(id,emailAddress,role)").
+		Fields("nextPageToken,permissions(id)").
+		PageSize(100).
 		SupportsAllDrives(true).
 		SupportsTeamDrives(true).
 		Pages(ctx, func(pl *drive.PermissionList) (err error) {

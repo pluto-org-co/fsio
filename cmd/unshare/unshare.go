@@ -9,7 +9,6 @@ import (
 
 	"github.com/pluto-org-co/fsio/googleutils"
 	"github.com/pluto-org-co/fsio/googleutils/directory"
-	"github.com/pluto-org-co/fsio/googleutils/drives"
 	"github.com/pluto-org-co/fsio/googleutils/driveutils"
 	"github.com/pluto-org-co/fsio/googleutils/shareddrives"
 	"github.com/urfave/cli/v3"
@@ -33,7 +32,7 @@ func UnshareFile(workerPool chan struct{}, wg *sync.WaitGroup, logger *slog.Logg
 	<-workerPool
 	wg.Go(func() {
 		defer func() { workerPool <- struct{}{} }()
-		logger := logger.With("id", file.Id, "access", len(file.PermissionIds))
+		logger := logger.With("id", file.Id)
 		logger.Debug("Found shared file")
 		err = driveutils.UnshareAll(ctx, driveSvc, file.Id)
 		if err != nil {
@@ -122,8 +121,9 @@ var Unshare = cli.Command{
 					IncludeTeamDriveItems(true).
 					Corpora("drive").
 					DriveId(driveEntry.Id).
+					PageSize(1000).
 					Q("mimeType = 'application/vnd.google-apps.folder'").
-					Fields("nextPageToken,files(id,name,fullFileExtension,mimeType,modifiedTime,permissions,permissionIds)").
+					Fields("nextPageToken,files(id,name)").
 					Pages(ctx, func(fl *drive.FileList) (err error) {
 						driveAccessedDirectories = append(driveAccessedDirectories, fl.Files...)
 						return nil
@@ -139,14 +139,14 @@ var Unshare = cli.Command{
 				}
 
 				logger.Info("Processing files")
-				for _, file := range shareddrives.SeqFiles(ctx, rootDriveService, driveEntry.Id) {
-					logger := logger.With("file", file.Name)
-
-					err = UnshareFile(workerPool, &wg, logger, rootDriveService, ctx, nil, file)
-					if err != nil {
-						return fmt.Errorf("failed to process file: %w", err)
-					}
-				}
+				// for _, file := range shareddrives.SeqFiles(ctx, rootDriveService, driveEntry.Id) {
+				// 	logger := logger.With("file", file.Name)
+				//
+				// 	err = UnshareFile(workerPool, &wg, logger, rootDriveService, ctx, nil, file)
+				// 	if err != nil {
+				// 		return fmt.Errorf("failed to process file: %w", err)
+				// 	}
+				// }
 			}
 		}
 
@@ -169,7 +169,8 @@ var Unshare = cli.Command{
 						List().
 						Corpora("user").
 						Q("mimeType = 'application/vnd.google-apps.folder'").
-						Fields("nextPageToken,files(id,name,fullFileExtension,mimeType,modifiedTime,permissions)").
+						PageSize(1000).
+						Fields("nextPageToken,files(id,name)").
 						Pages(ctx, func(fl *drive.FileList) (err error) {
 							userAccessedDirectories = append(userAccessedDirectories, fl.Files...)
 							return nil
@@ -184,14 +185,14 @@ var Unshare = cli.Command{
 					}
 
 					logger.Info("Processing Files")
-					for _, file := range drives.SeqFiles(ctx, userDriveSvc) {
-						logger := logger.With("file", file.Name)
-
-						err = UnshareFile(workerPool, &wg, logger, userDriveSvc, ctx, nil, file)
-						if err != nil {
-							return fmt.Errorf("failed to process file: %w", err)
-						}
-					}
+					//for _, file := range drives.SeqFiles(ctx, userDriveSvc) {
+					//	logger := logger.With("file", file.Name)
+					//
+					//	err = UnshareFile(workerPool, &wg, logger, userDriveSvc, ctx, nil, file)
+					//	if err != nil {
+					//		return fmt.Errorf("failed to process file: %w", err)
+					//	}
+					//}
 				}
 			}
 		}
