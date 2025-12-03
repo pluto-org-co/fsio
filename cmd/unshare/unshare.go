@@ -6,11 +6,14 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/pluto-org-co/fsio/googleutils"
 	"github.com/pluto-org-co/fsio/googleutils/directory"
+	"github.com/pluto-org-co/fsio/googleutils/drives"
 	"github.com/pluto-org-co/fsio/googleutils/driveutils"
 	"github.com/pluto-org-co/fsio/googleutils/shareddrives"
+	"github.com/pluto-org-co/fsio/ioutils"
 	"github.com/urfave/cli/v3"
 	"golang.org/x/exp/slog"
 	"golang.org/x/oauth2/google"
@@ -25,7 +28,9 @@ const ConfigFlag = "config"
 
 func ClientFromSubject(ctx context.Context, config *jwt.Config, subject string) (client *http.Client) {
 	config.Subject = subject
-	return config.Client(ctx)
+	client = config.Client(ctx)
+	client.Transport = ioutils.NewRetryTransport(client.Transport, 100, time.Minute)
+	return client
 }
 
 func UnshareFile(workerPool chan struct{}, wg *sync.WaitGroup, logger *slog.Logger, driveSvc *drive.Service, ctx context.Context, user *admin.User, file *drive.File) (err error) {
@@ -139,14 +144,14 @@ var Unshare = cli.Command{
 				}
 
 				logger.Info("Processing files")
-				// for _, file := range shareddrives.SeqFiles(ctx, rootDriveService, driveEntry.Id) {
-				// 	logger := logger.With("file", file.Name)
-				//
-				// 	err = UnshareFile(workerPool, &wg, logger, rootDriveService, ctx, nil, file)
-				// 	if err != nil {
-				// 		return fmt.Errorf("failed to process file: %w", err)
-				// 	}
-				// }
+				for _, file := range shareddrives.SeqFiles(ctx, rootDriveService, driveEntry.Id) {
+					logger := logger.With("file", file.Name)
+
+					err = UnshareFile(workerPool, &wg, logger, rootDriveService, ctx, nil, file)
+					if err != nil {
+						return fmt.Errorf("failed to process file: %w", err)
+					}
+				}
 			}
 		}
 
@@ -185,14 +190,14 @@ var Unshare = cli.Command{
 					}
 
 					logger.Info("Processing Files")
-					//for _, file := range drives.SeqFiles(ctx, userDriveSvc) {
-					//	logger := logger.With("file", file.Name)
-					//
-					//	err = UnshareFile(workerPool, &wg, logger, userDriveSvc, ctx, nil, file)
-					//	if err != nil {
-					//		return fmt.Errorf("failed to process file: %w", err)
-					//	}
-					//}
+					for _, file := range drives.SeqFiles(ctx, userDriveSvc) {
+						logger := logger.With("file", file.Name)
+
+						err = UnshareFile(workerPool, &wg, logger, userDriveSvc, ctx, nil, file)
+						if err != nil {
+							return fmt.Errorf("failed to process file: %w", err)
+						}
+					}
 				}
 			}
 		}
