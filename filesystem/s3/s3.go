@@ -26,6 +26,7 @@ import (
 	"iter"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -107,9 +108,9 @@ func LastModifiedFromObj(obj *minio.ObjectInfo) (lastModified time.Time) {
 
 	amzMeta, metaFound := obj.UserMetadata[XAmzMetaMTime]
 	if metaFound {
-		amzMetaTime, err := time.Parse(ioutils.DefaultTimeLayout, amzMeta)
+		asUnix, err := strconv.ParseInt(amzMeta, 10, 64)
 		if err == nil {
-			lastModified = amzMetaTime
+			lastModified = time.Unix(asUnix, 0)
 		} else {
 			metaFound = false
 		}
@@ -118,9 +119,9 @@ func LastModifiedFromObj(obj *minio.ObjectInfo) (lastModified time.Time) {
 	if !metaFound {
 		amzCustom, customFound := obj.UserMetadata[XAmzCustomMTime]
 		if customFound {
-			amzCustomTime, err := time.Parse(ioutils.DefaultTimeLayout, amzCustom)
+			asUnix, err := strconv.ParseInt(amzCustom, 10, 64)
 			if err == nil {
-				lastModified = amzCustomTime
+				lastModified = time.Unix(asUnix, 0)
 			}
 		}
 	}
@@ -244,7 +245,7 @@ func (s *S3) WriteFile(ctx context.Context, location []string, src io.Reader, mo
 		return nil, fmt.Errorf("failed to seek: %w", err)
 	}
 
-	sTime := modTime.Format(ioutils.DefaultTimeLayout)
+	sTime := strconv.FormatInt(modTime.Unix(), 10)
 
 	_, err = s.client.PutObject(
 		ctx,
